@@ -4,10 +4,20 @@ const float PI = 3.14159265359;
 
 in vec2 tex_coord;
 
-uniform float line_data[12];
-uniform int line_data_length;
+uniform int line_lengths[10];
 uniform float aspect_ratio;
 uniform float timer;
+
+uniform float line_data_1[2000];
+// uniform float line_data_1[200];
+// uniform float line_data_2[200];
+// uniform float line_data_3[200];
+// uniform float line_data_4[200];
+// uniform float line_data_5[200];
+// uniform float line_data_6[200];
+// uniform float line_data_7[200];
+// uniform float line_data_8[200];
+// uniform float line_data_9[200];
 
 
 out vec4 frag_color;
@@ -54,9 +64,15 @@ void main()
     float radius = length(coord)/sqrt(2.0);
     float angle = acos(dot(ref, coord/length(coord)));
 
-    if (radius <= 0.1119 && radius >= 0.11) {
-        frag_color = vec4(0.0, 0.0, 0.0, 0.0);
-    } else {
+
+    float eps = 0.0001;
+    float angle_step_size = 2.0 * PI / line_lengths[0];
+    int data_index = int(angle * angle_step_size);
+    float target_radius = 0.12 + line_data_1[data_index];
+
+    if (abs(radius - target_radius) <= eps)  {
         frag_color = vec4(1.0, 1.0, 1.0, 1.0);
+    } else {
+        frag_color = vec4(0.0, 0.0, 0.0, 0.0);
     }
 }

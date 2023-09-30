@@ -57,12 +57,13 @@ private:
 	}
 
 	virtual void visualize (VisualizationBuffer const&) = 0;
-	virtual void render (SDL_Renderer*) = 0;
+	virtual void get_result (float*) = 0;
 
 protected:
     SDL_AudioSpec const& spec;
 
 public:
+	virtual unsigned int get_result_size() = 0;
 
 	virtual void process_ring_buffer (VisualizationBuffer const& data) final {
 		SDL_LockMutex(vh_mutex);
@@ -82,10 +83,10 @@ public:
 		SDL_UnlockMutex(vh_mutex);
 	}
 
-	void await_and_render (SDL_Renderer* renderer) {
+	void await_result (float* result) {
 		await_buffer_processed();
 		SDL_LockMutex(vh_mutex);
-		render(renderer);
+		get_result(result);
 		SDL_UnlockMutex(vh_mutex);
 	}
 

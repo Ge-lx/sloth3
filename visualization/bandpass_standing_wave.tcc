@@ -26,6 +26,7 @@ private:
 	BPSW_Spec* params;
 	RollingWindow<double> rollingWindow;
 	FFTHandler fftHandler;
+	double* result;
 	bool const should_weigh = false;
 
 	SDL_Point* points;
@@ -41,7 +42,9 @@ private:
 			int beat_period_samples = round(spec.freq * beat_period_sec);
 			int multiples = 12 * params->win_length_samples / (beat_period_samples * 4);
 			params->crop_length_samples = std::min(((int) params->win_length_samples), beat_period_samples);
-			std::cout << "Setting window length to " << params->crop_length_samples << " samples" << std::endl;
+			delete[] result;
+			result = new double[params->crop_length_samples];
+			std::cout << "Setting output size to " << params->crop_length_samples << " samples" << std::endl;
 		}
 
 		// Execute fourier transformation
@@ -87,33 +90,20 @@ private:
 	    // Execute inverse fourier transformation
 	    fftHandler.exec_c2r();
 
-        // Crop to display area
-        double angle_offset = 0;
-        if (params->fft_phase == BPSW_Phase::Unchanged) {
-	        angle_offset = 2 * M_PI * (rollingWindow.current_index() / ((double) params->win_length_samples));
+	    for (int i = 0; i < params->crop_length_samples; i++) {
+	    	// Scaling is not preserved: irfft(rfft(x))[i] = x[i] * len(x)
+	    	result[i] = fftHandler.real[params->crop_offset + i] / params->win_length_samples;
 	    }
-		double* circle_angles = new double[params->crop_length_samples];
-		math::lin_space(circle_angles, params->crop_length_samples, M_PI, 3.0 * M_PI, true);
-        for (size_t i = 0; i < params->win_length_samples; i++) {
-
-        	if (i < params->crop_length_samples) {
-		    	// Scaling is not preserved: irfft(rfft(x))[i] = x[i] * len(x)
-		    	double const irfft_value = fftHandler.real[params->crop_offset + i] / params->win_length_samples;
-		        double const radius = params->c_rad_base + params->c_rad_extr * irfft_value;
-
-		        points[i].x = params->c_center_x + radius * std::cos(angle_offset + circle_angles[i]);
-		        points[i].y = params->c_center_y + radius * std::sin(angle_offset + circle_angles[i]);
-        	} else {
-	        	points[i].x = 0;
-	        	points[i].y = 0;
-			}
-        }
-        delete[] circle_angles;
 	}
 
-	void render (SDL_Renderer* renderer) {
-		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 225);
-		SDL_RenderDrawLines(renderer, points, params->crop_length_samples);
+	void get_result (float* output) {
+		for (int i = 0; i < params->crop_length_samples; i++) {
+			output[i] = result[i];
+		}
+	}
+
+	unsigned int get_result_size() {
+		return params->crop_length_samples;
 	}
 
 public:
@@ -125,10 +115,9 @@ public:
 		fftHandler(params->win_length_samples),
 		should_weigh(params->fft_freq_weighing != NULL)
 	{
+		result = new double[params->crop_length_samples];
 		std::cout << "Initializer list finised\n";
 		// assert(params->win_length_samples >= (params->crop_length_samples + params->crop_offset),
-		// 	"Cropped area is too large, window insufficient");
-		points = new SDL_Point[params->win_length_samples];
 		std::cout << "Initilizing BPSW with win_length_samples=" << params->win_length_samples << " and crop_length_samples=" << params->crop_length_samples << std::endl;
 
 		if (spec.samples > params->win_length_samples) {
@@ -137,6 +126,6 @@ public:
 	}
 
 	~BandpassStandingWave () {
-		delete[] points;
+		delete[] result;
 	}
 };
