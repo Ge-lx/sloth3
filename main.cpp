@@ -11,6 +11,7 @@
 #include "util/rolling_window.tcc"
 
 #include "visualization/bandpass_standing_wave.tcc"
+#include "graphics/realtime_audio.cpp"
 
 #include <SDL2/SDL.h>
 #include "sdl/sdl_audio.tcc"
@@ -69,10 +70,10 @@ void sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, si
 
     auto device_names = get_audio_device_names();
     std::cout << "Starting audio stream on \"" << device_names[device_id] << "\"" << std::endl;
-    auto stop_audio_stream = start_audio_stream(ringBuffer, spec, device_id);
+    // auto stop_audio_stream = start_audio_stream(ringBuffer, spec, device_id);
 
     printf("Starting UI\n\n");
-    ui_init();
+    // ui_init();
 
     auto last_frame = clk::now();
     auto last_print = clk::now();
@@ -82,94 +83,96 @@ void sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, si
 
     int samples_since_last_beat = 0;
 
-    while (ui_should_quit() == false) {
+    shader_init();
 
-        // SDL_ResizeEvent event = event;
-        // double const resize_to[2] = event.type == SDL_VIDEORESIZE ? {event.w, event.h}
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-        SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 225);
+    // while (ui_should_quit() == false) {
 
-        auto now = clk::now();
-        frame_counter++;
-        frame_us_acc += time_diff_us(last_frame, now);
-        if (time_diff_us(last_print, now) / 1000 >= print_interval_ms) {
-            double frame_avg_us = frame_us_acc / frame_counter;
-            frame_counter = 0;
-            frame_us_acc = 0;
-            last_print = now;
-            std::cout << "Frame after " << std::setw(10) << frame_avg_us << " us | "
-                << std::setw(8) << std::fixed << std::setprecision(2)
-                << frame_avg_us / frame_us_nominal * 100 << "% utilization\n";
-        }
+    //     // SDL_ResizeEvent event = event;
+    //     // double const resize_to[2] = event.type == SDL_VIDEORESIZE ? {event.w, event.h}
+    //     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    //     SDL_RenderClear(renderer);
+    //     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 225);
 
-        SampleT* const buf = ringBuffer->dequeue_dirty();
-        last_frame = clk::now();
+    //     auto now = clk::now();
+    //     frame_counter++;
+    //     frame_us_acc += time_diff_us(last_frame, now);
+    //     if (time_diff_us(last_print, now) / 1000 >= print_interval_ms) {
+    //         double frame_avg_us = frame_us_acc / frame_counter;
+    //         frame_counter = 0;
+    //         frame_us_acc = 0;
+    //         last_print = now;
+    //         std::cout << "Frame after " << std::setw(10) << frame_avg_us << " us | "
+    //             << std::setw(8) << std::fixed << std::setprecision(2)
+    //             << frame_avg_us / frame_us_nominal * 100 << "% utilization\n";
+    //     }
 
-        for (size_t i = 0; i < spec.samples; i++) {
-            mono[i] = buf[2*i] / ((double) std::pow(2, 16));//(buf[2*i] + buf[2*i + 1]) / ((double) std::pow(2, 17));
-        }
+    //     SampleT* const buf = ringBuffer->dequeue_dirty();
+    //     last_frame = clk::now();
 
-        memset(buf, spec.silence, spec.channels * sizeof(SampleT) * spec.samples);
-        ringBuffer->enqueue_clean(buf);
+    //     for (size_t i = 0; i < spec.samples; i++) {
+    //         mono[i] = buf[2*i] / ((double) std::pow(2, 16));//(buf[2*i] + buf[2*i + 1]) / ((double) std::pow(2, 17));
+    //     }
 
-        // Maximum filter
-        double maxval = math::max_value(mono, spec.samples);
-        maxval = *max_filter.update(&maxval);
-        maxval = maxval > 2 ? 2 : (maxval < 0.01 ? 0.02 : maxval);
-        for (size_t i = 0; i < spec.samples; i++) {
-            mono[i] /= 2.5 * maxval;
-        }
+    //     memset(buf, spec.silence, spec.channels * sizeof(SampleT) * spec.samples);
+    //     ringBuffer->enqueue_clean(buf);
 
-        // std::cout << "Running btrack on new buffer" << std::endl;
-        // btrack.getBeatTimeInSeconds()
-        // std::cout << "beatCounter: " << btrack.beatCounter << std::endl;
-        // samples_since_last_beat += spec.samples;
+    //     // Maximum filter
+    //     double maxval = math::max_value(mono, spec.samples);
+    //     maxval = *max_filter.update(&maxval);
+    //     maxval = maxval > 2 ? 2 : (maxval < 0.01 ? 0.02 : maxval);
+    //     for (size_t i = 0; i < spec.samples; i++) {
+    //         mono[i] /= 2.5 * maxval;
+    //     }
 
-        btrack.processAudioFrame(mono);
-        bool is_new_beat = btrack.beatDueInCurrentFrame();
-        double tempo_estimate = btrack.getCurrentTempoEstimate();
+    //     // std::cout << "Running btrack on new buffer" << std::endl;
+    //     // btrack.getBeatTimeInSeconds()
+    //     // std::cout << "beatCounter: " << btrack.beatCounter << std::endl;
+    //     // samples_since_last_beat += spec.samples;
 
-        VisualizationBuffer const data {
-            .audio_buffer = mono,
-            .tempo_estimate = tempo_estimate,
-            .is_new_beat = is_new_beat
-        };
+    //     btrack.processAudioFrame(mono);
+    //     bool is_new_beat = btrack.beatDueInCurrentFrame();
+    //     double tempo_estimate = btrack.getCurrentTempoEstimate();
 
-        if (is_new_beat) {
-            // *phase_offset += 200;
-            // *phase_offset_2 += 200;
-            // samples_since_last_beat = 0;
-            std::cout << "Tempo: " << btrack.getCurrentTempoEstimate() << " BPM" << std::endl;
-            // double bpm = btrack.getCurrentTempoEstimate();
-            // double period_s = 60 / bpm;
-            // double samples = spec.freq * period_s;
-            // std::cout << "period_s: " << period_s << "\t samples: " << samples << std::endl;
+    //     VisualizationBuffer const data {
+    //         .audio_buffer = mono,
+    //         .tempo_estimate = tempo_estimate,
+    //         .is_new_beat = is_new_beat
+    //     };
 
-            // for (size_t i = 0; i < num_handlers; i++) {
+    //     if (is_new_beat) {
+    //         // *phase_offset += 200;
+    //         // *phase_offset_2 += 200;
+    //         // samples_since_last_beat = 0;
+    //         std::cout << "Tempo: " << btrack.getCurrentTempoEstimate() << " BPM" << std::endl;
+    //         // double bpm = btrack.getCurrentTempoEstimate();
+    //         // double period_s = 60 / bpm;
+    //         // double samples = spec.freq * period_s;
+    //         // std::cout << "period_s: " << period_s << "\t samples: " << samples << std::endl;
 
-            /*       CURSED      */
+    //         // for (size_t i = 0; i < num_handlers; i++) {
 
-            //     ((BandpassStandingWave*)handlers[i])->params->crop_length_samples = ;
-            // }
-        }
+    //         /*       CURSED      */
+
+    //         //     ((BandpassStandingWave*)handlers[i])->params->crop_length_samples = ;
+    //         // }
+    //     }
 
 
-        for (size_t i = 0; i < num_handlers; i++) {
-            handlers[i]->process_ring_buffer(data);
-        }
+    //     for (size_t i = 0; i < num_handlers; i++) {
+    //         handlers[i]->process_ring_buffer(data);
+    //     }
 
-        for (size_t i = 0; i < num_handlers; i++) {
-            handlers[i]->await_and_render(renderer);
-        }
+    //     for (size_t i = 0; i < num_handlers; i++) {
+    //         handlers[i]->await_and_render(renderer);
+    //     }
 
-        SDL_RenderPresent(renderer);
-    }
+    //     SDL_RenderPresent(renderer);
+    // }
 
     printf("\n\nStopping audio stream and deconstructing.\n");
 
-    ui_shutdown();
-    stop_audio_stream();
+    // ui_shutdown();
+    // stop_audio_stream();
 
     delete ringBuffer;
     delete[] mono;
