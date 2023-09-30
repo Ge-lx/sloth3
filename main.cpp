@@ -57,7 +57,7 @@ void ui_shutdown () {
 
 template <typename SampleT>
 void sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, size_t num_buffers_delay,
-    VisualizationHandler** handlers, size_t num_handlers, double print_interval_ms, double* phase_offset, double* phase_offset_2) {
+    VisualizationHandler** handlers, size_t num_handlers, double print_interval_ms/*, double* phase_offset, double* phase_offset_2*/) {
 
     using namespace audio;
 
@@ -141,10 +141,10 @@ void sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, si
             // *phase_offset_2 += 200;
             // samples_since_last_beat = 0;
             std::cout << "Tempo: " << btrack.getCurrentTempoEstimate() << " BPM" << std::endl;
-            double bpm = btrack.getCurrentTempoEstimate();
-            double period_s = 60 / bpm;
-            double samples = spec.freq * period_s;
-            std::cout << "period_s: " << period_s << "\t samples: " << samples << std::endl;
+            // double bpm = btrack.getCurrentTempoEstimate();
+            // double period_s = 60 / bpm;
+            // double samples = spec.freq * period_s;
+            // std::cout << "period_s: " << period_s << "\t samples: " << samples << std::endl;
 
             // for (size_t i = 0; i < num_handlers; i++) {
 
@@ -209,7 +209,7 @@ int main (int argc, char** argv) {
     spec.channels = 2;
 
     const static double update_interval_ms = 1000 / 60;
-    const static double window_length_ms = 100;
+    const static double window_length_ms = 300;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;
 
@@ -221,9 +221,9 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = true,
-        .fft_dispersion = -0.02, // -0.1
+        .fft_dispersion = 0, // -0.1
         .fft_phase = BPSW_Phase::Standing,
-        .fft_phase_const = 0,
+        .fft_phase_const = 1,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
         .c_center_x = WINDOW_WIDTH / 2,
@@ -245,7 +245,7 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = false,
-        .fft_dispersion = -0.02, // -0.1
+        .fft_dispersion = -0.1, // -0.1
         .fft_phase = BPSW_Phase::Unchanged,
         .fft_phase_const = 0.8,
         .crop_length_samples = window_length_samples - 800,
@@ -295,11 +295,11 @@ int main (int argc, char** argv) {
 
     constexpr size_t num_handlers = 2;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw, &bpsw_inner/*, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw_inner, &bpsw/*, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
     BTrack btrack(spec.freq, spec.samples / 2, spec.samples);
 
-    sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms, &(params.fft_phase_const), &(params_inner.fft_phase_const));
+    sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
 }

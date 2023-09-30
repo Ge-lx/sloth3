@@ -7,7 +7,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -DUSE_FFTW") # USE_FFTW is used in BTrack
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 add_subdirectory(third_party/fftw-3.3.10)
 add_subdirectory(third_party/SDL)
