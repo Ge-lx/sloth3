@@ -17,8 +17,8 @@ struct BPSW_Spec {
 	size_t crop_length_samples; // Displayed length of the window
 	size_t crop_offset; // Display window offset
 
-	unsigned int c_center_x, c_center_y; // Circle center location
-	double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
+	// unsigned int c_center_x, c_center_y; // Circle center location
+	// double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
 };
 
 class BandpassStandingWave : public VisualizationHandler {

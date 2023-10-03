@@ -68,7 +68,7 @@ void main()
     float eps = 0.0001;
     float angle_step_size = 2.0 * PI / line_lengths[0];
     int data_index = int(angle * angle_step_size);
-    float target_radius = 0.12 + line_data_1[data_index];
+    float target_radius = 0.12 + (line_data_1[data_index] / 2.0);
 
     if (abs(radius - target_radius) <= eps)  {
         frag_color = vec4(1.0, 1.0, 1.0, 1.0);

@@ -4,26 +4,9 @@
 #include <iostream>
 #include <iomanip>
 #include <chrono>
-
-#include "util/fft_handler.h"
-#include "util/ring_buffer.tcc"
-#include "util/math.tcc"
-#include "util/rolling_window.tcc"
-
-#include "visualization/bandpass_standing_wave.tcc"
-
-#include <SDL2/SDL.h>
-#include "sdl/sdl_audio.tcc"
-#define WINDOW_HEIGHT 1000
-#define WINDOW_WIDTH 1800
-
-#include "BTrack.h"
-
 #include <string>
-#include <iostream>
 #include <vector>
 #include <algorithm>
-
 
 // Graphics includes
 #include <glad.h>
@@ -32,23 +15,35 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-// classes developed during lab lectures to manage shaders and to load models
-#include "shader.h"
-#include <linmath.h>
-
 // Load imgui for the User interface
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
+// Linear algebra subroutines
+#include "linmath.h"
+
+// Beat tracking algorithm
+#include "BTrack.h"
+
+// This needs be fixed. Imports from "graphics/shader.h"S
+#include "graphics/shader.h"
+
+#include "util/fft_handler.h"
+#include "util/ring_buffer.tcc"
+#include "util/math.tcc"
+#include "util/rolling_window.tcc"
+#include "sdl/sdl_audio.tcc"
+#include "visualization/bandpass_standing_wave.tcc"
+
+
 // dimensions of application's window
 GLuint screenWidth = 1200, screenHeight = 1000;
 
-/////////////////////////////////// DEKLARE FUNCTIONS//////////////////////////////////////////////////////////////////////
-// callback functions for keyboard events
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void render_glfw_texture();
+// callback functions for glfw
+void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void glfw_render_texture();
 
 
 // initialise Mouse informations
@@ -57,7 +52,7 @@ GLfloat lastFrame = 0.0f;
 GLfloat aspect_ratio = 1.1f;
 
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
+void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
     // if ESC is pressed, we close the application
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -65,7 +60,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     aspect_ratio = width / ((float) height);
     glViewport(0, 0, width, height);
@@ -108,8 +103,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     int samples_since_last_beat = 0;
 
 
-
-
     // Initialization of OpenGL context using GLFW
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -136,16 +129,16 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         return -1;
     }
 
-    // we put in relation the window and the callbacks
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-
     // we define the viewport dimensions
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
-    aspect_ratio = width / ((double) height);
+    glfw_framebuffer_size_callback(window, width, height);
+
+    // we put in relation the window and the callbacks
+    glfwSetKeyCallback(window, glfw_key_callback);
+    glfwSetFramebufferSizeCallback(window, glfw_framebuffer_size_callback);
+    glfwSwapInterval(0);
+
 
     //imgui
     ImGui::CreateContext();
@@ -164,9 +157,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     // Rendering loop
     while(!glfwWindowShouldClose(window))
     {
-        // SDL_ResizeEvent event = event;
-        // double const resize_to[2] = event.type == SDL_VIDEORESIZE ? {event.w, event.h}
-
         auto now = clk::now();
         frame_counter++;
         frame_us_acc += time_diff_us(last_frame, now);
@@ -199,11 +189,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             mono[i] /= 2.5 * maxval;
         }
 
-        // std::cout << "Running btrack on new buffer" << std::endl;
-        // btrack.getBeatTimeInSeconds()
-        // std::cout << "beatCounter: " << btrack.beatCounter << std::endl;
-        // samples_since_last_beat += spec.samples;
-
         btrack.processAudioFrame(mono);
         bool is_new_beat = btrack.beatDueInCurrentFrame();
         double tempo_estimate = btrack.getCurrentTempoEstimate();
@@ -213,24 +198,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             .tempo_estimate = tempo_estimate,
             .is_new_beat = is_new_beat
         };
-
-        if (is_new_beat) {
-            // *phase_offset += 200;
-            // *phase_offset_2 += 200;
-            // samples_since_last_beat = 0;
-            std::cout << "Tempo: " << btrack.getCurrentTempoEstimate() << " BPM" << std::endl;
-            // double bpm = btrack.getCurrentTempoEstimate();
-            // double period_s = 60 / bpm;
-            // double samples = spec.freq * period_s;
-            // std::cout << "period_s: " << period_s << "\t samples: " << samples << std::endl;
-
-            // for (size_t i = 0; i < num_handlers; i++) {
-
-            /*       CURSED      */
-
-            //     ((BandpassStandingWave*)handlers[i])->params->crop_length_samples = ;
-            // }
-        }
 
 
         for (size_t i = 0; i < num_handlers; i++) {
@@ -247,9 +214,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             handlers[i]->await_result(((float*)results[i]));
         }
 
-        auto before_us = clk::now();
-
-
         // we determine the time passed from the beginning
         // and we calculate time difference between current frame rendering and the previous one
         GLfloat currentFrame = glfwGetTime();
@@ -262,21 +226,19 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         mainShader.Use();
 
 
-        int const NUM_LINES = 10;
+        // int const num_handlers = 10;
         glUniform1f(glGetUniformLocation(mainShader.Program, "aspect_ratio"), aspect_ratio);
         glUniform1f(glGetUniformLocation(mainShader.Program, "timer"), currentFrame);
+        glUniform1iv(glGetUniformLocation(mainShader.Program, "line_lengths"), num_handlers, line_lengths);
 
-        glUniform1iv(glGetUniformLocation(mainShader.Program, "line_lengths"), NUM_LINES, line_lengths);
 
-
-        for (int i = 0; i < NUM_LINES; i++) {
+        for (int i = 0; i < num_handlers; i++) {
             std::string var_name = "line_data_";
             var_name.append(std::to_string(i));
             glUniform1fv(glGetUniformLocation(mainShader.Program, var_name.c_str()), line_lengths[i], results[i]);
         }
 
-        render_glfw_texture();
-        frame_us_transfer_acc += time_diff_us(before_us, clk::now());
+        glfw_render_texture();
 
         // Check is an I/O event is happening
         glfwPollEvents();
@@ -294,9 +256,11 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        auto before_us = clk::now();
 
         // Swapping back and front buffers
         glfwSwapBuffers(window);
+        frame_us_transfer_acc += time_diff_us(before_us, clk::now());
         for (int i = 0; i < num_handlers; i++) {
             delete[] results[i];
         }
@@ -320,8 +284,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
     printf("\n\nStopping audio stream and deconstructing.\n");
 
-    // ui_shutdown();
-    // stop_audio_stream();
+    stop_audio_stream();
 
     delete ringBuffer;
     delete[] mono;
@@ -373,15 +336,15 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = true,
-        .fft_dispersion = 0, // -0.1
+        .fft_dispersion = 0,
         .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 1,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
-        .c_center_x = WINDOW_WIDTH / 2,
-        .c_center_y = WINDOW_HEIGHT / 2,
-        .c_rad_base = WINDOW_HEIGHT / 2 - 80,
-        .c_rad_extr = 300,
+        // .c_center_x = WINDOW_WIDTH / 2,
+        // .c_center_y = WINDOW_HEIGHT / 2,
+        // .c_rad_base = WINDOW_HEIGHT / 2 - 80,
+        // .c_rad_extr = 300,
     };
     size_t c_length = params.win_length_samples / 2 + 1;
     double* freq_weighing = new double[c_length];
@@ -402,10 +365,10 @@ int main (int argc, char** argv) {
         .fft_phase_const = 0.8,
         .crop_length_samples = window_length_samples - 800,
         .crop_offset = 400,
-        .c_center_x = WINDOW_WIDTH / 2,
-        .c_center_y = WINDOW_HEIGHT / 2,
-        .c_rad_base = WINDOW_HEIGHT / 2 - 400,
-        .c_rad_extr = 400,
+        // .c_center_x = WINDOW_WIDTH / 2,
+        // .c_center_y = WINDOW_HEIGHT / 2,
+        // .c_rad_base = WINDOW_HEIGHT / 2 - 400,
+        // .c_rad_extr = 400,
     };
     size_t c_length_i = params_inner.win_length_samples / 2 + 1;
     double* freq_weighing_inner = new double[c_length_i];
@@ -415,35 +378,12 @@ int main (int argc, char** argv) {
     params_inner.fft_freq_weighing = freq_weighing_inner;
 
 
-    // BPSW_Spec params2 {
-    //     .win_length_samples = window_length_samples / 2,
-    //     .win_window_fn = true,
-    //     .fft_dispersion = 0,
-    //     .fft_phase = BPSW_Phase::Standing,
-    //     .fft_phase_const = 0,
-    //     .crop_length_samples = window_length_samples / 2,
-    //     .crop_offset = 0,
-    //     .c_center_x = WINDOW_WIDTH / 2,
-    //     .c_center_y = WINDOW_HEIGHT / 2,
-    //     .c_rad_base = WINDOW_HEIGHT / 2 - 50,
-    //     .c_rad_extr = 300,
-    // };
-    // size_t c_length_2 = params2.win_length_samples / 2 + 1;
-    // double* freq_weighing_2 = new double[c_length_2];
-    // for (size_t i = 0; i < c_length_2; i++) {
-    //     freq_weighing_2[i] = i > 110 ? 3 :
-    //                          i > 50 ? 1.5 : 0;
-    // }
-    // params2.fft_freq_weighing = freq_weighing_2;
-
     /* -------------------- CONFIGURATION END ----------------------------- */
 
     printf("Instantiating visualizations\n");
     BandpassStandingWave bpsw {spec, &params};
     BandpassStandingWave bpsw_inner {spec, &params_inner};
     printf("Done\n");
-    // BandpassStandingWave bpsw_i {spec, params_i};
-    // BandpassStandingWave bpsw2 {spec, params2};
 
     constexpr size_t num_handlers = 2;
     printf("Instantiating visualization handler\n");
@@ -457,7 +397,7 @@ int main (int argc, char** argv) {
 }
 
 
-void render_glfw_texture()
+void glfw_render_texture()
 {
 
     float floatArray[] = {

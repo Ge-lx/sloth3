@@ -1,4 +1,4 @@
-// This is basically the shader.h from the lecture, but with the extension that it also loads a geometry shader
+// classes developed during lab lectures to manage shaders and to load models
 
 #pragma once
 

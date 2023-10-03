@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <sstream>
 
+#include <SDL2/SDL.h>
+
 namespace audio {
 
     void sdl_init () {
