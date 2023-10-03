@@ -26,15 +26,13 @@
 // Beat tracking algorithm
 #include "BTrack.h"
 
-// This needs be fixed. Imports from "graphics/shader.h"S
-#include "graphics/shader.h"
-
 #include "util/fft_handler.h"
 #include "util/ring_buffer.tcc"
 #include "util/math.tcc"
 #include "util/rolling_window.tcc"
-#include "sdl/sdl_audio.tcc"
+#include "util/sdl_audio.tcc"
 #include "visualization/bandpass_standing_wave.tcc"
+#include "graphics/shader.h"
 
 
 // dimensions of application's window
@@ -198,6 +196,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             .tempo_estimate = tempo_estimate,
             .is_new_beat = is_new_beat
         };
+
+        if (is_new_beat) {
+            std::cout << "BPM: " << tempo_estimate << std::endl;
+        }
 
 
         for (size_t i = 0; i < num_handlers; i++) {
