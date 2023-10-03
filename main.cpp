@@ -151,6 +151,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
     // we create the Shader Programs used in the application
     Shader mainShader("/home/gelx/Programming/repos/sloth3/graphics/shaders/vertex.vert", "/home/gelx/Programming/repos/sloth3/graphics/shaders/fragment.frag");
+    GLuint ssbo;
+    glGenBuffers(1, &ssbo);
+
+    glfwMakeContextCurrent(window);
 
     // Rendering loop
     while(!glfwWindowShouldClose(window))
@@ -227,23 +231,32 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
         mainShader.Use();
 
+        GLfloat center[2] = {0, 0};
+        GLfloat radius_base = 0.4;
+        GLfloat radius_scale = 0.6;
 
         // int const num_handlers = 10;
         glUniform1f(glGetUniformLocation(mainShader.Program, "aspect_ratio"), aspect_ratio);
         glUniform1f(glGetUniformLocation(mainShader.Program, "timer"), currentFrame);
-        glUniform1iv(glGetUniformLocation(mainShader.Program, "line_lengths"), num_handlers, line_lengths);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "radius_base"), radius_base);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "radius_scale"), radius_scale);
+        glUniform2f(glGetUniformLocation(mainShader.Program, "center"), center[0], center[1]);
+        glUniform1i(glGetUniformLocation(mainShader.Program, "num_samples"), line_lengths[0]);
+        // std::cout << "Updating SSBO with " << line_lengths[0] << " samples" << std::endl;
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, line_lengths[0] * sizeof(GLfloat), results[0], GL_STATIC_READ);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 
 
-        for (int i = 0; i < num_handlers; i++) {
-            std::string var_name = "line_data_";
-            var_name.append(std::to_string(i));
-            glUniform1fv(glGetUniformLocation(mainShader.Program, var_name.c_str()), line_lengths[i], results[i]);
-        }
+        // for (int i = 0; i < num_handlers; i++) {
+        //     std::string var_name = "line_data_";
+        //     var_name.append(std::to_string(i));
+        //     glUniform1fv(glGetUniformLocation(mainShader.Program, var_name.c_str()), line_lengths[i], results[i]);
+        // }
 
         glfw_render_texture();
-
-        // Check is an I/O event is happening
-        glfwPollEvents();
 
         /////////////////////////////////// IMGUI INTERFACE /////////////////////////////////////////////////////////////////////////////
         ImGui_ImplOpenGL3_NewFrame();
@@ -260,6 +273,9 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         auto before_us = clk::now();
 
+
+        // Check is an I/O event is happening
+        glfwPollEvents();
         // Swapping back and front buffers
         glfwSwapBuffers(window);
         frame_us_transfer_acc += time_diff_us(before_us, clk::now());
