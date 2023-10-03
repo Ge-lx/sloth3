@@ -214,10 +214,12 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         GLint line_lengths[10];
         GLfloat** results = new GLfloat* [num_handlers];
         for (size_t i = 0; i < num_handlers; i++) {
+            handlers[i]->await_buffer_processed(false); // Keep lock from here
             int result_size = handlers[i]->get_result_size();
             line_lengths[i] = result_size;
             results[i] = new GLfloat[result_size];
             handlers[i]->await_result(((float*)results[i]));
+            handlers[i]->unlock_mutex(); // Unlock
         }
 
         // we determine the time passed from the beginning
@@ -342,7 +344,7 @@ int main (int argc, char** argv) {
     spec.channels = 2;
 
     const static double update_interval_ms = 1000 / 60;
-    const static double window_length_ms = 300;
+    const static double window_length_ms = 700;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;
 
@@ -368,7 +370,7 @@ int main (int argc, char** argv) {
     double* freq_weighing = new double[c_length];
     for (size_t i = 0; i < c_length; i++) {
         freq_weighing[i] = i < 10 ? 1.5 :
-                           i < 40 ? 1 : 0.1;
+                           i < 40 ? 1 : 0.5;
     }
     params.fft_freq_weighing = freq_weighing;
 
@@ -399,13 +401,13 @@ int main (int argc, char** argv) {
     /* -------------------- CONFIGURATION END ----------------------------- */
 
     printf("Instantiating visualizations\n");
-    BandpassStandingWave bpsw {spec, &params};
-    BandpassStandingWave bpsw_inner {spec, &params_inner};
+    BandpassStandingWave bpsw {spec, params};
+    BandpassStandingWave bpsw_inner {spec, params_inner};
     printf("Done\n");
 
     constexpr size_t num_handlers = 2;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw_inner, &bpsw/*, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw, &bpsw_inner/*, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;

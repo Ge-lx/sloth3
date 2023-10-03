@@ -75,18 +75,24 @@ public:
         SDL_CondSignal(vh_cond);
 	}
 
-	void await_buffer_processed () {
+	void await_buffer_processed (bool unlock = true) {
 		SDL_LockMutex(vh_mutex);
 		while (buffer_processed == false) {
 			SDL_CondWait(vh_cond, vh_mutex);
 		}
-		SDL_UnlockMutex(vh_mutex);
+		if (unlock) {
+			SDL_UnlockMutex(vh_mutex);
+		}
 	}
 
 	void await_result (float* result) {
-		await_buffer_processed();
-		SDL_LockMutex(vh_mutex);
+		await_buffer_processed(false);
+		// SDL_LockMutex(vh_mutex);
 		get_result(result);
+		SDL_UnlockMutex(vh_mutex);
+	}
+
+	void unlock_mutex () {
 		SDL_UnlockMutex(vh_mutex);
 	}
 
