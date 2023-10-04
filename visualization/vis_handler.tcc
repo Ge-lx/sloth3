@@ -17,7 +17,7 @@ private:
     SDL_Thread* vh_thread;
 
     bool should_stop = false;
-    bool buffer_processed = false;
+    bool buffer_processed = true;
     VisualizationBuffer buffer;
 
     static int worker_thread (void * _self) {
@@ -33,6 +33,7 @@ private:
 
 			SDL_CondWait(self->vh_cond, self->vh_mutex);
 			if (self->buffer_processed == true) {
+				SDL_UnlockMutex(self->vh_mutex);
 				continue;
 			}
 
@@ -86,8 +87,8 @@ public:
 	}
 
 	void await_result (float* result) {
-		await_buffer_processed(false);
-		// SDL_LockMutex(vh_mutex);
+		await_buffer_processed(true);
+		SDL_LockMutex(vh_mutex);
 		get_result(result);
 		SDL_UnlockMutex(vh_mutex);
 	}

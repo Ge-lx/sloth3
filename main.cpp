@@ -33,6 +33,7 @@
 #include "util/sdl_audio.tcc"
 #include "visualization/bandpass_standing_wave.tcc"
 #include "graphics/shader.h"
+#include "graphics/shader_locations.h"
 
 
 // dimensions of application's window
@@ -48,9 +49,21 @@ void glfw_render_texture();
 GLfloat deltaTime;
 GLfloat lastFrame = 0.0f;
 GLfloat aspect_ratio = 1.1f;
+GLfloat color_bg[4] = {0.0, 0.0, 0.0, 0.0};
 
 
-void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
+struct __attribute__ ((packed)) LineParams {
+    GLfloat color_inner_0;
+    GLfloat color_inner_1;
+    GLfloat color_inner_2;
+    GLfloat color_inner_3;
+    GLfloat radius_base;
+    GLfloat radius_scale;
+    GLfloat data_end_idx;
+    GLfloat __;
+};
+
+void glfw_key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mode*/)
 {
     // if ESC is pressed, we close the application
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -58,7 +71,7 @@ void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, in
 
 }
 
-void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void glfw_framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 {
     aspect_ratio = width / ((float) height);
     glViewport(0, 0, width, height);
@@ -74,7 +87,7 @@ double time_diff_us (std::chrono::time_point<clk> const& a, std::chrono::time_po
 
 template <typename SampleT>
 int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, size_t num_buffers_delay,
-    VisualizationHandler** handlers, size_t num_handlers, double print_interval_ms/*, double* phase_offset, double* phase_offset_2*/) {
+    VisualizationHandler** handlers, size_t const num_handlers, double print_interval_ms/*, double* phase_offset, double* phase_offset_2*/) {
 
     using namespace audio;
 
@@ -97,9 +110,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     double frame_us_acc = 0;
     double frame_us_transfer_acc = 0;
     size_t frame_counter = 0;
-
-    int samples_since_last_beat = 0;
-
 
     // Initialization of OpenGL context using GLFW
     glfwInit();
@@ -150,9 +160,11 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 
     // we create the Shader Programs used in the application
-    Shader mainShader("/home/gelx/Programming/repos/sloth3/graphics/shaders/vertex.vert", "/home/gelx/Programming/repos/sloth3/graphics/shaders/fragment.frag");
-    GLuint ssbo;
-    glGenBuffers(1, &ssbo);
+    Shader mainShader(SHADER_VERTEX, SHADER_FRAGMENT);
+    GLuint ssbo_data;
+    GLuint ssbo_params;
+    glGenBuffers(1, &ssbo_data);
+    glGenBuffers(1, &ssbo_params);
 
     glfwMakeContextCurrent(window);
 
@@ -211,15 +223,34 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         }
 
 
-        GLint line_lengths[10];
-        GLfloat** results = new GLfloat* [num_handlers];
+        LineParams params[num_handlers];
         for (size_t i = 0; i < num_handlers; i++) {
             handlers[i]->await_buffer_processed(false); // Keep lock from here
+
+            BPSW_Spec vis_params = ((BandpassStandingWave*)handlers[i])->params;
+
             int result_size = handlers[i]->get_result_size();
-            line_lengths[i] = result_size;
-            results[i] = new GLfloat[result_size];
-            handlers[i]->await_result(((float*)results[i]));
+            params[i] = LineParams{
+                .color_inner_0 = vis_params.color_inner[0],
+                .color_inner_1 = vis_params.color_inner[1],
+                .color_inner_2 = vis_params.color_inner[2],
+                .color_inner_3 = vis_params.color_inner[3],
+                .radius_base = vis_params.c_rad_base,
+                .radius_scale = vis_params.c_rad_extr,
+                .data_end_idx = (i == 0 ? result_size : (params[i-1].data_end_idx + result_size)),
+                // .center = {vis_params.c_center_x, vis_params.c_center_y},
+                // .color_inner = {1.0, 1.0, 1.0, 1.0}
+            };
+
             handlers[i]->unlock_mutex(); // Unlock
+        }
+
+        // Shared result buffer for all handler results
+        size_t const total_length = params[num_handlers-1].data_end_idx;
+        GLfloat* results_concat = new GLfloat[total_length];
+        for (size_t i = 0; i < num_handlers; i++) {
+            size_t offset = i == 0 ? 0 : params[i-1].data_end_idx;
+            handlers[i]->await_result(((float*)(results_concat + offset)));
         }
 
         // we determine the time passed from the beginning
@@ -240,15 +271,19 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         // int const num_handlers = 10;
         glUniform1f(glGetUniformLocation(mainShader.Program, "aspect_ratio"), aspect_ratio);
         glUniform1f(glGetUniformLocation(mainShader.Program, "timer"), currentFrame);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "radius_base"), radius_base);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "radius_scale"), radius_scale);
-        glUniform2f(glGetUniformLocation(mainShader.Program, "center"), center[0], center[1]);
-        glUniform1i(glGetUniformLocation(mainShader.Program, "num_samples"), line_lengths[0]);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[0]"), color_bg[0]);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[1]"), color_bg[1]);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[2]"), color_bg[2]);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[3]"), color_bg[3]);
+        // glUniform1i(glGetUniformLocation(mainShader.Program, "num_samples"), line_lengths[0]);
         // std::cout << "Updating SSBO with " << line_lengths[0] << " samples" << std::endl;
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, line_lengths[0] * sizeof(GLfloat), results[0], GL_STATIC_READ);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_params);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, num_handlers * sizeof(LineParams), params, GL_STATIC_READ);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_params);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_data);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, total_length * sizeof(GLfloat), results_concat, GL_STATIC_READ);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_data);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 
 
@@ -281,11 +316,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         // Swapping back and front buffers
         glfwSwapBuffers(window);
         frame_us_transfer_acc += time_diff_us(before_us, clk::now());
-        for (int i = 0; i < num_handlers; i++) {
-            delete[] results[i];
-        }
-        delete[] results;
-
+        // for (size_t i = 0; i < num_handlers; i++) {
+        //     delete[] results[i];
+        // }
+        delete[] results_concat;
     }
 
     // when I exit from the graphics loop, it is because the application is closing
@@ -300,14 +334,15 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
     // we close and delete the created context
     glfwTerminate();
-    return 0;
+
 
     printf("\n\nStopping audio stream and deconstructing.\n");
-
     stop_audio_stream();
 
     delete ringBuffer;
     delete[] mono;
+
+    return 0;
 }
 
 int main (int argc, char** argv) {
@@ -344,7 +379,7 @@ int main (int argc, char** argv) {
     spec.channels = 2;
 
     const static double update_interval_ms = 1000 / 60;
-    const static double window_length_ms = 700;
+    const static double window_length_ms = 30;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;
 
@@ -361,10 +396,11 @@ int main (int argc, char** argv) {
         .fft_phase_const = 1,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
-        // .c_center_x = WINDOW_WIDTH / 2,
-        // .c_center_y = WINDOW_HEIGHT / 2,
-        // .c_rad_base = WINDOW_HEIGHT / 2 - 80,
-        // .c_rad_extr = 300,
+        .c_center_x = 0,
+        .c_center_y = 0,
+        .c_rad_base = 0.6,
+        .c_rad_extr = 1,
+        .color_inner = {0.40784313725490196, 0.5568627450980392, 0.14901960784313725, 1.0}
     };
     size_t c_length = params.win_length_samples / 2 + 1;
     double* freq_weighing = new double[c_length];
@@ -385,10 +421,11 @@ int main (int argc, char** argv) {
         .fft_phase_const = 0.8,
         .crop_length_samples = window_length_samples - 800,
         .crop_offset = 400,
-        // .c_center_x = WINDOW_WIDTH / 2,
-        // .c_center_y = WINDOW_HEIGHT / 2,
-        // .c_rad_base = WINDOW_HEIGHT / 2 - 400,
-        // .c_rad_extr = 400,
+        .c_center_x = 0,
+        .c_center_y = 0,
+        .c_rad_base = 0.3,
+        .c_rad_extr = 1,
+        .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
     };
     size_t c_length_i = params_inner.win_length_samples / 2 + 1;
     double* freq_weighing_inner = new double[c_length_i];
@@ -413,7 +450,9 @@ int main (int argc, char** argv) {
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
     BTrack btrack(spec.freq, spec.samples / 2, spec.samples);
 
-    return sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
+    int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
+    std::cout << "Mainloop ended" << std::endl;
+    return retval;
 }
 
 

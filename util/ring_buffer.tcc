@@ -24,6 +24,8 @@ public:
     }
 
     ~ThreadSafeQueue () {
+        SDL_CondBroadcast(rb_cond);
+        SDL_LockMutex(rb_mutex);
         SDL_DestroyCond(rb_cond);
         SDL_DestroyMutex(rb_mutex);
     }
@@ -44,6 +46,7 @@ public:
             // release lock as long as the wait and reaquire it afterwards.
             int res = SDL_CondWaitTimeout(rb_cond, rb_mutex, timeout_ms);
             if (res == SDL_MUTEX_TIMEDOUT) {
+                SDL_UnlockMutex(rb_mutex);
                 throw timeout_exception("Waiting for new elements timed out");
             }
         }

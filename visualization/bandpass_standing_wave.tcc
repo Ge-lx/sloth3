@@ -17,13 +17,13 @@ struct BPSW_Spec {
 	size_t crop_length_samples; // Displayed length of the window
 	size_t crop_offset; // Display window offset
 
-	// unsigned int c_center_x, c_center_y; // Circle center location
-	// double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
+	unsigned int c_center_x, c_center_y; // Circle center location
+	double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
+	float color_inner[4]; // Inner color of the circle
 };
 
 class BandpassStandingWave : public VisualizationHandler {
 private:
-	BPSW_Spec& params;
 	RollingWindow<double> rollingWindow;
 	FFTHandler fftHandler;
 	double* result;
@@ -40,7 +40,7 @@ private:
 		if (data.is_new_beat & params.adaptive_crop) {
 			double beat_period_sec = 60 / data.tempo_estimate;
 			int beat_period_samples = round(spec.freq * beat_period_sec);
-			int multiples = 12 * params.win_length_samples / (beat_period_samples * 4);
+			// int multiples = 12 * params.win_length_samples / (beat_period_samples * 4);
 			params.crop_length_samples = std::min(((int) params.win_length_samples), beat_period_samples);
 			delete[] result;
 			result = new double[params.crop_length_samples];
@@ -90,14 +90,14 @@ private:
 	    // Execute inverse fourier transformation
 	    fftHandler.exec_c2r();
 
-	    for (int i = 0; i < params.crop_length_samples; i++) {
+	    for (size_t i = 0; i < params.crop_length_samples; i++) {
 	    	// Scaling is not preserved: irfft(rfft(x))[i] = x[i] * len(x)
 	    	result[i] = fftHandler.real[params.crop_offset + i] / params.win_length_samples;
 	    }
 	}
 
 	void get_result (float* output) {
-		for (int i = 0; i < params.crop_length_samples; i++) {
+		for (size_t i = 0; i < params.crop_length_samples; i++) {
 			output[i] = result[i];
 		}
 	}
@@ -107,6 +107,7 @@ private:
 	}
 
 public:
+	BPSW_Spec& params;
 
 	BandpassStandingWave (SDL_AudioSpec const& spec, BPSW_Spec& params) :
 		VisualizationHandler(spec),

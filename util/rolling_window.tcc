@@ -74,7 +74,7 @@ public:
 		return index;
 	}
 
-	size_t reset_index () {
+	void reset_index () {
 		index = window_length_samples;
 	}
 };

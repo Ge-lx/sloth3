@@ -47,7 +47,7 @@ public:
             vertexCode = vShaderStream.str();
             fragmentCode = fShaderStream.str();
         }
-        catch (ifstream::failure e)
+        catch (ifstream::failure& e)
         {
             cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << endl;
         }
@@ -101,7 +101,7 @@ public:
                 // Convert stream into string
                 geometryCode = geometryStream.str();
             }
-            catch (ifstream::failure e)
+            catch (ifstream::failure& e)
             {
                 cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << endl;
             }

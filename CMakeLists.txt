@@ -5,6 +5,14 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+
+file(WRITE ${CMAKE_CURRENT_LIST_DIR}/graphics/shader_locations.h
+"#include \"glad.h\"
+const GLchar* SHADER_FRAGMENT = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/fragment.frag\";
+const GLchar* SHADER_VERTEX = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/vertex.vert\";
+"
+)
+
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -DUSE_FFTW") # USE_FFTW is used in BTrack
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
