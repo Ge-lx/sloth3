@@ -1,3 +1,4 @@
 a.out
 build
 third_party/fftw*
+graphics/shader_locations.h

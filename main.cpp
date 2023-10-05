@@ -49,7 +49,7 @@ void glfw_render_texture();
 GLfloat deltaTime;
 GLfloat lastFrame = 0.0f;
 GLfloat aspect_ratio = 1.1f;
-GLfloat color_bg[4] = {0.0, 0.0, 0.0, 0.0};
+GLfloat color_bg[4] = {0.5, 0.5, 0.5, 1.0};
 
 
 struct __attribute__ ((packed)) LineParams {
@@ -379,7 +379,7 @@ int main (int argc, char** argv) {
     spec.channels = 2;
 
     const static double update_interval_ms = 1000 / 60;
-    const static double window_length_ms = 30;
+    const static double window_length_ms = 100;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;
 
@@ -390,23 +390,23 @@ int main (int argc, char** argv) {
         .win_length_samples = window_length_samples,
         .update_length_samples = spec.samples,
         .win_window_fn = true,
-        .adaptive_crop = true,
-        .fft_dispersion = 0,
-        .fft_phase = BPSW_Phase::Standing,
-        .fft_phase_const = 1,
+        .adaptive_crop = false,
+        .fft_dispersion = 1.24153,
+        .fft_phase = BPSW_Phase::Constant,
+        .fft_phase_const = 2.14313,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
         .c_center_x = 0,
         .c_center_y = 0,
         .c_rad_base = 0.6,
-        .c_rad_extr = 1,
+        .c_rad_extr = 0.6,
         .color_inner = {0.40784313725490196, 0.5568627450980392, 0.14901960784313725, 1.0}
     };
     size_t c_length = params.win_length_samples / 2 + 1;
     double* freq_weighing = new double[c_length];
     for (size_t i = 0; i < c_length; i++) {
         freq_weighing[i] = i < 10 ? 1.5 :
-                           i < 40 ? 1 : 0.5;
+                           i < 40 ? 1 : 0.05;
     }
     params.fft_freq_weighing = freq_weighing;
 
@@ -417,14 +417,14 @@ int main (int argc, char** argv) {
         .win_window_fn = true,
         .adaptive_crop = false,
         .fft_dispersion = -0.1, // -0.1
-        .fft_phase = BPSW_Phase::Unchanged,
+        .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 0.8,
-        .crop_length_samples = window_length_samples - 800,
+        .crop_length_samples = (window_length_samples) - 800,
         .crop_offset = 400,
         .c_center_x = 0,
         .c_center_y = 0,
         .c_rad_base = 0.3,
-        .c_rad_extr = 1,
+        .c_rad_extr = 1.6,
         .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
     };
     size_t c_length_i = params_inner.win_length_samples / 2 + 1;
