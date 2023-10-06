@@ -63,9 +63,9 @@ private:
 
 	    // Transform polar frequency spectrum
 	    for (size_t i = 0; i < c_length; i++) {
+	        double abs_weighted = abs_vals[i] * params.fft_freq_weighing[i];
 	        double bin_phase = 2 * M_PI * (index_last / ((double) params.win_length_samples));
 	        double phase_offset = 2 * M_PI * (params.fft_phase_const / ((double) params.win_length_samples));
-	        double abs_weighted = abs_vals[i] * params.fft_freq_weighing[i];
 
 	        double arg_shifted = 0;
 	        switch (params.fft_phase) {
@@ -108,6 +108,7 @@ private:
 
 public:
 	BPSW_Spec& params;
+	std::deque<std::vector<float>> data_lookback_beats;
 
 	BandpassStandingWave (SDL_AudioSpec const& spec, BPSW_Spec& params) :
 		VisualizationHandler(spec),
