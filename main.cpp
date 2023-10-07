@@ -46,13 +46,15 @@ void glfw_render_texture();
 
 
 // initialise Mouse informations
-GLfloat pattern_scale = 700.0f;
-GLfloat time_scale = 700.0f;
-GLfloat deltaTime = 0.0f;
-GLfloat period_ms = 10.0f;
+GLfloat pattern_scale = 4271.0f;
+GLfloat movement_scale = 10208.0f;
+GLfloat time_scale = 26000.0f;
+GLfloat delta_time_s = 0.0f;
+GLfloat period_s = 10.0f;
 GLfloat lastFrame = 0.0f;
 GLfloat aspect_ratio = 1.1f;
 GLfloat color_bg[4] = {0.5, 0.5, 0.5, 1.0};
+GLuint beat_counter = 0;
 
 
 struct __attribute__ ((packed)) LineParams {
@@ -103,7 +105,7 @@ double time_diff_us (std::chrono::time_point<clk> const& a, std::chrono::time_po
 
 template <typename SampleT>
 int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, size_t num_buffers_delay,
-    VisualizationHandler** handlers, size_t const num_handlers, double print_interval_ms/*, double* phase_offset, double* phase_offset_2*/) {
+    VisualizationHandler** handlers, size_t const num_handlers, double print_interval_ms, unsigned int const target_fps) {
 
     using namespace audio;
 
@@ -124,7 +126,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     auto last_print = clk::now();
     double frame_us_nominal = (spec.samples / (double) spec.freq) * 1000000;
     double frame_us_acc = 0;
-    double frame_us_transfer_acc = 0;
     size_t frame_counter = 0;
 
     // Initialization of OpenGL context using GLFW
@@ -183,26 +184,11 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     glGenBuffers(1, &ssbo_data);
     glGenBuffers(1, &ssbo_params);
     glGenBuffers(1, &ssbo_aux_data);
-
     glfwMakeContextCurrent(window);
 
     // Rendering loop
     while(!glfwWindowShouldClose(window))
     {
-        auto now = clk::now();
-        frame_counter++;
-        frame_us_acc += time_diff_us(last_frame, now);
-        if (time_diff_us(last_print, now) / 1000 >= print_interval_ms) {
-            double frame_avg_us = frame_us_acc / frame_counter;
-            frame_us_acc = 0;
-            last_print = now;
-            std::cout << "Frame after " << std::setw(10) << frame_avg_us << " us | "
-                << std::setw(8) << std::fixed << std::setprecision(2)
-                << frame_avg_us / frame_us_nominal * 100 << "% utilization\t"
-                << frame_us_transfer_acc / frame_counter << " avg transfer time [us]\n";
-            frame_counter = 0;
-        }
-
         try {
             SampleT* const buf = ringBuffer->dequeue_dirty();
             last_frame = clk::now();
@@ -297,13 +283,15 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         // we determine the time passed from the beginning
         // and we calculate time difference between current frame rendering and the previous one 
         GLfloat shader_timer = glfwGetTime();
-        deltaTime += shader_timer - lastFrame;
-        lastFrame = shader_timer;
-        period_ms = 60.0 / tempo_estimate;
         if (is_new_beat) {
-            std::cout << "BPM: " << tempo_estimate << std::endl;
-            deltaTime = 0;
+            beat_counter = (beat_counter + 1) % 4;
+            if (beat_counter == 0) {
+                delta_time_s = 0;
+            }
         }
+        delta_time_s += shader_timer - lastFrame;
+        lastFrame = shader_timer;
+        period_s = 60.0 / tempo_estimate;
 
         // we "clear" the frame and z buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -313,9 +301,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         // int const num_handlers = 10;
         glUniform1f(glGetUniformLocation(mainShader.Program, "aspect_ratio"), aspect_ratio);
         glUniform1f(glGetUniformLocation(mainShader.Program, "pattern_scale"), pattern_scale);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "movement_scale"), movement_scale);
         glUniform1f(glGetUniformLocation(mainShader.Program, "time_scale"), time_scale);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_ms"), deltaTime);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "period_ms"), period_ms);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_s"), delta_time_s);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "period_s"), period_s);
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[0]"), color_bg[0]);
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[1]"), color_bg[1]);
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[2]"), color_bg[2]);
@@ -342,8 +331,9 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         ImGui::NewFrame();
         // ImGUI window creation
         ImGui::Begin("Performance");
-        ImGui::SliderFloat("TimeScale", &time_scale, 1.0, 64000.0);
-        ImGui::SliderFloat("PatternScale", &pattern_scale, 1.0, 10000.0);
+        ImGui::SliderFloat("timescale", &time_scale, 1.0, 128000.0);
+        ImGui::SliderFloat("pattern scale", &pattern_scale, 1.0, 20000.0);
+        ImGui::SliderFloat("movement scale", &movement_scale, 1.0, 20000.0);
 
         // Ends of imgui
         ImGui::End();
@@ -351,16 +341,27 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        auto before_us = clk::now();
-
 
         // Check is an I/O event is happening
         glfwPollEvents();
         // Swapping back and front buffers
         glfwSwapBuffers(window);
-        frame_us_transfer_acc += time_diff_us(before_us, clk::now());
         delete[] results_concat;
         delete[] aux_buffers_concat;
+
+        auto now = clk::now();
+        frame_counter++;
+        frame_us_acc += time_diff_us(last_frame, now);
+        if (time_diff_us(last_print, now) / 1000 >= print_interval_ms) {
+            double frame_avg_us = frame_us_acc / frame_counter;
+            frame_us_acc = 0;
+            last_print = now;
+            std::cout << "Processed in " << std::setw(10) << frame_avg_us << " us | "
+                << std::setw(8) << std::fixed << std::setprecision(2)
+                << frame_avg_us / frame_us_nominal * 100 << "% for " << target_fps << "FPS | \t"
+                << "BPM: " << tempo_estimate << std::endl;
+            frame_counter = 0;
+        }
     }
 
     // when I exit from the graphics loop, it is because the application is closing
@@ -425,7 +426,8 @@ int main (int argc, char** argv) {
     spec.freq = 48000;
     spec.channels = 2;
 
-    const static double update_interval_ms = 1000 / 60;
+    const static unsigned int target_fps = 60;
+    const static double update_interval_ms = 1000.0 / ((double) target_fps);
     const static double window_length_ms = 100;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;//20;
@@ -493,7 +495,7 @@ int main (int argc, char** argv) {
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
     BTrack btrack(spec.freq, spec.samples / 2, spec.samples);
 
-    int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
+    int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms, target_fps);
     std::cout << "Mainloop ended" << std::endl;
     delete[] freq_weighing;
     delete[] freq_weighing_inner;

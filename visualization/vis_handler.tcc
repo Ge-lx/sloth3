@@ -91,8 +91,7 @@ public:
 	}
 
 	void await_result (float* result) {
-		await_buffer_processed(true);
-		SDL_LockMutex(vh_mutex);
+		await_buffer_processed(false);
 		get_result(result);
 		SDL_UnlockMutex(vh_mutex);
 	}

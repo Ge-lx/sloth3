@@ -8,9 +8,10 @@ const vec4 light_blue = vec4(0.3058823529411765, 0.803921568627451, 0.7686274509
 in vec2 tex_coord;
 
 uniform float aspect_ratio;
-uniform float delta_time_ms;
-uniform float period_ms;
+uniform float delta_time_s;
+uniform float period_s;
 uniform float pattern_scale;
+uniform float movement_scale;
 uniform float time_scale;
 uniform vec4 color_bg;
 
@@ -49,16 +50,17 @@ float gauss_peak (float x, float mu, float sigma) {
 vec4 color_pattern_fill (vec2 coord_polar, vec4 base_color, vec4 accet_color)
 {
     float time_clog2 = pow(2, int(log2(time_scale)));
-    float unit_phase = delta_time_ms / (period_ms * time_scale);
-    unit_phase = unit_phase - int(unit_phase);
+    float unit_phase = delta_time_s / (period_s * time_clog2);
     float radius = coord_polar[0];
     float angle = coord_polar[1] + unit_phase * 2 * PI;
 
-    float angle_step_size = 2 * PI / (pattern_scale - 1);
+    float movement_clog2 = pow(2, int(log2(movement_scale)));
+    float scale = pattern_scale * (1 + cos(delta_time_s / (2.0 * period_s) * PI) / movement_clog2);
+    float angle_step_size = 2 * PI / (scale - 1);
     float quant_upper = angle / angle_step_size;
     int quant_lower = int(quant_upper);
 
-    float alpha = gauss_peak(quant_upper - quant_lower, 0, 0.01);
+    float alpha = gauss_peak(quant_upper - quant_lower, 0, 0.05);
     return mix(base_color, accet_color, alpha);
 }
 
@@ -97,8 +99,10 @@ void main()
         float alpha = index_float - data_index_lower;
         float result = mix(data_upper, data_lower, alpha);
         float target_radius = params[0].radius_base + params[0].radius_scale * result;
-        if (i != params[0].num_aux_lines) {
-            target_radius = target_radius + (delta_time_ms + i * float(period_ms)) / (float(period_ms) * 4);
+        if (i != params[0].num_aux_lines) { // Last index is outline of main wobble
+            float beats_frac = delta_time_s / period_s;
+            float single_beat_offest = beats_frac - int(beats_frac);
+            target_radius = target_radius + (single_beat_offest + i) * float(period_s) / (float(period_s) * 4);
         }
 
         float err = gauss_peak(abs(radius - target_radius), 0, 0.001);
@@ -132,11 +136,8 @@ void main()
 
         if (err < 0.0) {
             vec4 color = {params[i].color_inner_0, params[i].color_inner_1, params[i].color_inner_2, 1.0};
-            if (i == 0) {
-                frag_color = color_pattern_fill(vec2(radius, angle), color, light_blue);
-            } else {
-                frag_color = color;
-            }
+            vec4 accet_color = i == 0 ? light_blue : color * 0.3;
+            frag_color = color_pattern_fill(vec2(radius, angle), color, accet_color);
         } else if (i != 0) {
             float mix_factor = clamp(log(1 + (err * 50)), 0, 1.0);
             frag_color = mix(frag_color * 0.1, frag_color, mix_factor);
