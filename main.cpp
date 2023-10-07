@@ -49,11 +49,12 @@ void glfw_render_texture();
 GLfloat pattern_scale = 4271.0f;
 GLfloat movement_scale = 10208.0f;
 GLfloat time_scale = 26000.0f;
-GLfloat delta_time_s = 0.0f;
+GLfloat delta_time_4_s = 0.0f;
+GLfloat delta_time_1_s = 0.0f;
 GLfloat period_s = 10.0f;
 GLfloat lastFrame = 0.0f;
 GLfloat aspect_ratio = 1.1f;
-GLfloat color_bg[4] = {0.5, 0.5, 0.5, 1.0};
+GLfloat color_bg[4] = {0.05, 0.05, 0.05, 1.0};
 GLuint beat_counter = 0;
 
 
@@ -254,7 +255,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
                         ((float*) results_concat + ((size_t) params[i].data_end_idx)))
                 );
 
-                if (queue.size() > 6 && queue.size() > 0) {
+                if (queue.size() > 4 && queue.size() > 0) {
                     queue.pop_front();
                 }
             }
@@ -285,11 +286,13 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         GLfloat shader_timer = glfwGetTime();
         if (is_new_beat) {
             beat_counter = (beat_counter + 1) % 4;
+            delta_time_1_s = 0;
             if (beat_counter == 0) {
-                delta_time_s = 0;
+                delta_time_4_s = 0;
             }
         }
-        delta_time_s += shader_timer - lastFrame;
+        delta_time_4_s += shader_timer - lastFrame;
+        delta_time_1_s += shader_timer - lastFrame;
         lastFrame = shader_timer;
         period_s = 60.0 / tempo_estimate;
 
@@ -303,13 +306,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glUniform1f(glGetUniformLocation(mainShader.Program, "pattern_scale"), pattern_scale);
         glUniform1f(glGetUniformLocation(mainShader.Program, "movement_scale"), movement_scale);
         glUniform1f(glGetUniformLocation(mainShader.Program, "time_scale"), time_scale);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_s"), delta_time_s);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_4_s"), delta_time_4_s);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_1_s"), delta_time_1_s);
         glUniform1f(glGetUniformLocation(mainShader.Program, "period_s"), period_s);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[0]"), color_bg[0]);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[1]"), color_bg[1]);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[2]"), color_bg[2]);
-        glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[3]"), color_bg[3]);
-
+        glUniform4f(glGetUniformLocation(mainShader.Program, "color_bg"), color_bg[0], color_bg[1], color_bg[2], color_bg[3]);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_params);
         glBufferData(GL_SHADER_STORAGE_BUFFER, num_handlers * sizeof(LineParams), params, GL_STATIC_READ);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_params);
@@ -447,7 +447,7 @@ int main (int argc, char** argv) {
         .crop_offset = 0,
         .c_rad_base = 0.6,
         .c_rad_extr = 0.6,
-        .color_inner = {0.043137254901960784, 0.2627450980392157, 0.4980392156862745, 1.0}
+        .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
     };
     size_t c_length = params.win_length_samples / 2 + 1;
     double* freq_weighing = new double[c_length];

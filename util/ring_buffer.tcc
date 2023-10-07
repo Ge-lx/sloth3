@@ -35,8 +35,12 @@ public:
     // Add an element to the queue.
     void enqueue (T t) {
         SDL_LockMutex(rb_mutex);
-        q.push(t);
-        SDL_CondSignal(rb_cond);
+        if (q.size() > min_fill_len + 2) {
+            std::cout << "XRUN" << std::endl;
+        } else {
+            q.push(t);
+            SDL_CondSignal(rb_cond);
+        }
         SDL_UnlockMutex(rb_mutex);
     }
 
