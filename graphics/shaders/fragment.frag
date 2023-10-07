@@ -3,16 +3,7 @@
 const float PI = 3.14159265359;
 const float EULER = 2.71828;
 
-const vec4 colors[] = {
-    vec4(0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0), // orange
-    vec4(0.40784313725490196, 0.5568627450980392, 0.14901960784313725, 1.0), // green
-    vec4(0.3058823529411765, 0.803921568627451, 0.7686274509803922, 1.0), // blueish
-    vec4(0.2823529411764706, 0.2627450980392157, 0.28627450980392155, 1.0) // greyish
-};
-
 const vec4 light_blue = vec4(0.3058823529411765, 0.803921568627451, 0.7686274509803922, 1.0);
-
-const float radius_base_CHANGEME[] = {0.6, 0.3};
 
 in vec2 tex_coord;
 
@@ -34,7 +25,6 @@ struct LineParams {
     uint num_aux_lines;
 };
 
-
 layout (std430, binding=1) buffer info
 {
     LineParams params[];
@@ -52,6 +42,10 @@ layout (std430, binding=3) buffer data_aux
 
 out vec4 frag_color;
 
+float gauss_peak (float x, float mu, float sigma) {
+    return pow(EULER, -1./2. * (x - mu) / sigma);
+}
+
 vec4 color_pattern_fill (vec2 coord_polar, vec4 base_color, vec4 accet_color)
 {
     float time_clog2 = pow(2, int(log2(time_scale)));
@@ -64,9 +58,7 @@ vec4 color_pattern_fill (vec2 coord_polar, vec4 base_color, vec4 accet_color)
     float quant_upper = angle / angle_step_size;
     int quant_lower = int(quant_upper);
 
-    float alpha = quant_upper - quant_lower;
-    alpha = pow(EULER, -1./2. * (alpha - 0) / 0.01);
-    // return mix(base_color, accet_color, alpha);
+    float alpha = gauss_peak(quant_upper - quant_lower, 0, 0.01);
     return mix(base_color, accet_color, alpha);
 }
 
@@ -109,13 +101,8 @@ void main()
             target_radius = target_radius + (delta_time_ms + i * float(period_ms)) / (float(period_ms) * 4);
         }
 
-        float err = abs(radius - target_radius);
-        // if (err < 0.005) {
-        //     frag_color = light_blue;
-        // }
-        err = pow(EULER, -1./2. * (err - 0) / 0.001);
-        // return mix(base_color, accet_color, err);
-        frag_color = frag_color + mix(vec4(0.0, 0.0, 0.0, 0.0), vec4(1.0, 1.0, 1.0, 1.0), err);
+        float err = gauss_peak(abs(radius - target_radius), 0, 0.001);
+        frag_color = frag_color + mix(color_bg, vec4(1.0, 1.0, 1.0, 1.0), err);
 
         if (i != params[0].num_aux_lines) {
             offset = offset + int(params[0].buffer_length);

@@ -17,7 +17,6 @@ struct BPSW_Spec {
 	size_t crop_length_samples; // Displayed length of the window
 	size_t crop_offset; // Display window offset
 
-	unsigned int c_center_x, c_center_y; // Circle center location
 	double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
 	float color_inner[4]; // Inner color of the circle
 };
@@ -40,7 +39,6 @@ private:
 		if (data.is_new_beat & params.adaptive_crop) {
 			double beat_period_sec = 60 / data.tempo_estimate;
 			int beat_period_samples = round(spec.freq * beat_period_sec);
-			// int multiples = 12 * params.win_length_samples / (beat_period_samples * 4);
 			params.crop_length_samples = std::min(((int) params.win_length_samples), beat_period_samples);
 			delete[] result;
 			result = new double[params.crop_length_samples];
@@ -112,10 +110,10 @@ public:
 
 	BandpassStandingWave (SDL_AudioSpec const& spec, BPSW_Spec& params) :
 		VisualizationHandler(spec),
-		params(params),
 		rollingWindow(params.win_length_samples, 0, params.win_window_fn),
 		fftHandler(params.win_length_samples),
-		should_weigh(params.fft_freq_weighing != NULL)
+		should_weigh(params.fft_freq_weighing != NULL),
+		params(params)
 	{
 		result = new double[params.crop_length_samples];
 		std::cout << "Initializer list finised\n";

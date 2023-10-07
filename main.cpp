@@ -66,6 +66,19 @@ struct __attribute__ ((packed)) LineParams {
     GLuint num_aux_lines;
 };
 
+LineParams build_line_params (BPSW_Spec const& spec, size_t buffer_length, size_t data_end_idx) {
+    return LineParams{
+        .color_inner_0 = spec.color_inner[0],
+        .color_inner_1 = spec.color_inner[1],
+        .color_inner_2 = spec.color_inner[2],
+        .radius_base = (float) spec.c_rad_base,
+        .radius_scale = (float) spec.c_rad_extr,
+        .data_end_idx = (GLfloat) data_end_idx,
+        .buffer_length = (GLuint) buffer_length,
+        .num_aux_lines = 0
+    };
+}
+
 void glfw_key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mode*/)
 {
     // if ESC is pressed, we close the application
@@ -227,21 +240,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         for (size_t i = 0; i < num_handlers; i++) {
             handlers[i]->await_buffer_processed(false); // Keep lock from here
 
-            BPSW_Spec vis_params = ((BandpassStandingWave*)handlers[i])->params;
-
             int result_size = handlers[i]->get_result_size();
-            params[i] = LineParams{
-                .color_inner_0 = vis_params.color_inner[0],
-                .color_inner_1 = vis_params.color_inner[1],
-                .color_inner_2 = vis_params.color_inner[2],
-                .radius_base = vis_params.c_rad_base,
-                .radius_scale = vis_params.c_rad_extr,
-                .data_end_idx = (i == 0 ? result_size : (params[i-1].data_end_idx + result_size)),
-                .buffer_length = result_size,
-                .num_aux_lines = 0,
-                // .center = {vis_params.c_center_x, vis_params.c_center_y},
-                // .color_inner = {1.0, 1.0, 1.0, 1.0}
-            };
+            BPSW_Spec vis_params = ((BandpassStandingWave*)handlers[i])->params;
+            size_t data_end_idx = (i == 0 ? result_size : (params[i-1].data_end_idx + result_size));
+            params[i] = build_line_params(vis_params, result_size, data_end_idx);
 
             handlers[i]->unlock_mutex(); // Unlock
         }
@@ -303,10 +305,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
         mainShader.Use();
 
-        GLfloat center[2] = {0, 0};
-        GLfloat radius_base = 0.4;
-        GLfloat radius_scale = 0.6;
-
         // int const num_handlers = 10;
         glUniform1f(glGetUniformLocation(mainShader.Program, "aspect_ratio"), aspect_ratio);
         glUniform1f(glGetUniformLocation(mainShader.Program, "pattern_scale"), pattern_scale);
@@ -317,8 +315,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[1]"), color_bg[1]);
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[2]"), color_bg[2]);
         glUniform1f(glGetUniformLocation(mainShader.Program, "color_bg[3]"), color_bg[3]);
-        // glUniform1i(glGetUniformLocation(mainShader.Program, "num_samples"), line_lengths[0]);
-        // std::cout << "Updating SSBO with " << line_lengths[0] << " samples" << std::endl;
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_params);
         glBufferData(GL_SHADER_STORAGE_BUFFER, num_handlers * sizeof(LineParams), params, GL_STATIC_READ);
@@ -332,13 +328,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glBufferData(GL_SHADER_STORAGE_BUFFER, aux_buffer_total_length * sizeof(GLfloat), aux_buffers_concat, GL_STATIC_READ);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_aux_data);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
-
-
-        // for (int i = 0; i < num_handlers; i++) {
-        //     std::string var_name = "line_data_";
-        //     var_name.append(std::to_string(i));
-        //     glUniform1fv(glGetUniformLocation(mainShader.Program, var_name.c_str()), line_lengths[i], results[i]);
-        // }
 
         glfw_render_texture();
 
@@ -365,9 +354,6 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         // Swapping back and front buffers
         glfwSwapBuffers(window);
         frame_us_transfer_acc += time_diff_us(before_us, clk::now());
-        // for (size_t i = 0; i < num_handlers; i++) {
-        //     delete[] results[i];
-        // }
         delete[] results_concat;
         delete[] aux_buffers_concat;
     }
@@ -431,7 +417,7 @@ int main (int argc, char** argv) {
     const static double update_interval_ms = 1000 / 60;
     const static double window_length_ms = 100;
     const static double print_interval_ms = 2000;
-    const static int num_buffers_delay = 20;
+    const static int num_buffers_delay = 1;//20;
 
     size_t window_length_samples = window_length_ms / 1000 * spec.freq;
     spec.samples = (size_t) update_interval_ms / 1000.0 * spec.freq;
@@ -441,13 +427,11 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = false,
-        .fft_dispersion = 1.24153,
-        .fft_phase = BPSW_Phase::Constant,
+        .fft_dispersion = 0.1,
+        .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 2.14313,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
-        .c_center_x = 0,
-        .c_center_y = 0,
         .c_rad_base = 0.6,
         .c_rad_extr = 0.6,
         .color_inner = {0.043137254901960784, 0.2627450980392157, 0.4980392156862745, 1.0}
@@ -467,12 +451,10 @@ int main (int argc, char** argv) {
         .win_window_fn = true,
         .adaptive_crop = false,
         .fft_dispersion = -0.1, // -0.1
-        .fft_phase = BPSW_Phase::Constant,
+        .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 0.8,
         .crop_length_samples = (window_length_samples) - 800,
         .crop_offset = 400,
-        .c_center_x = 0,
-        .c_center_y = 0,
         .c_rad_base = 0.3,
         .c_rad_extr = 1.8,
         .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
