@@ -15,9 +15,13 @@ namespace audio {
     template <typename SampleT>
     void sdl_audio_cb (void* userdata, uint8_t* stream, int len) {
         RingBuffer<SampleT>* rBuf = (RingBuffer<SampleT>*) userdata;
-        SampleT* buf = rBuf->dequeue_clean();
-        std::memcpy(buf, stream, len);
-        rBuf->enqueue_dirty(buf);
+        try {
+            SampleT* buf = rBuf->dequeue_clean();
+            std::memcpy(buf, stream, len);
+            rBuf->enqueue_dirty(buf);
+        } catch (const timeout_exception& e) {
+            //
+        }
     }
 
     std::vector<std::string> get_audio_device_names () {
@@ -64,7 +68,7 @@ namespace audio {
 
         printf("SDL Audio initialized\n");
 
-        auto close_audio_stream = [&dev] () {
+        auto close_audio_stream = [dev] () {
             SDL_CloseAudioDevice(dev);
         };
         return close_audio_stream;

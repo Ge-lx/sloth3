@@ -16,6 +16,7 @@ private:
     SDL_mutex* rb_mutex;
     SDL_cond* rb_cond;
     size_t min_fill_len;
+    bool draining = false;
 
 public:
     ThreadSafeQueue (size_t min_fill_len) : q(), min_fill_len(min_fill_len) {
@@ -24,8 +25,9 @@ public:
     }
 
     ~ThreadSafeQueue () {
-        SDL_CondBroadcast(rb_cond);
         SDL_LockMutex(rb_mutex);
+        SDL_CondBroadcast(rb_cond);
+        SDL_UnlockMutex(rb_mutex);
         SDL_DestroyCond(rb_cond);
         SDL_DestroyMutex(rb_mutex);
     }
@@ -34,8 +36,8 @@ public:
     void enqueue (T t) {
         SDL_LockMutex(rb_mutex);
         q.push(t);
-        SDL_UnlockMutex(rb_mutex);
         SDL_CondSignal(rb_cond);
+        SDL_UnlockMutex(rb_mutex);
     }
 
     // Get the "front"-element.
@@ -45,7 +47,7 @@ public:
         while (q.size() < min_fill_len) {
             // release lock as long as the wait and reaquire it afterwards.
             int res = SDL_CondWaitTimeout(rb_cond, rb_mutex, timeout_ms);
-            if (res == SDL_MUTEX_TIMEDOUT) {
+            if (res == SDL_MUTEX_TIMEDOUT || draining) {
                 SDL_UnlockMutex(rb_mutex);
                 throw timeout_exception("Waiting for new elements timed out");
             }
@@ -55,6 +57,13 @@ public:
         SDL_UnlockMutex(rb_mutex);
         return val;
     }
+
+    void drain () {
+        SDL_LockMutex(rb_mutex);
+        draining = true;
+        SDL_CondSignal(rb_cond);
+        SDL_UnlockMutex(rb_mutex);
+    }
 };
 
 template <typename T>
@@ -62,6 +71,7 @@ class RingBuffer  {
 private:
     ThreadSafeQueue<T*> clean;
     ThreadSafeQueue<T*> dirty;
+    bool draining = false;
 
 public:
     size_t buffer_len, num_buffers;
@@ -75,6 +85,13 @@ public:
     }
 
     ~RingBuffer () {
+        drain();
+    }
+
+    void drain() {
+        draining = true;
+        clean.drain();
+        dirty.drain();
         while (true) {
             try {
                 T* buf = clean.dequeue(100);
@@ -94,18 +111,23 @@ public:
     }
 
     T* dequeue_clean () {
+        if (draining) throw timeout_exception("RingBuffer is draining");
         return clean.dequeue();
     }
 
+    T* dequeue_dirty () {
+        if (draining) throw timeout_exception("RingBuffer is draining");
+        return dirty.dequeue();
+    }
+
     void enqueue_clean (T* buf) {
+        if (draining) return;
         clean.enqueue(buf);
     }
 
     void enqueue_dirty (T* buf) {
+        if (draining) return;
         dirty.enqueue(buf);
     }
 
-    T* dequeue_dirty () {
-        return dirty.dequeue();
-    }
 };

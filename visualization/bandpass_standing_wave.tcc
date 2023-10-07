@@ -34,11 +34,11 @@ private:
 
 		// Update the rolling window and
 		size_t index_last = rollingWindow.current_index();
-		double* const window_data = rollingWindow.update(data.audio_buffer, VisualizationHandler::spec.samples, data.is_new_beat);
+		double* const window_data = rollingWindow.update(data.audio_buffer, audio_spec.samples, data.is_new_beat);
 
 		if (data.is_new_beat & params.adaptive_crop) {
 			double beat_period_sec = 60 / data.tempo_estimate;
-			int beat_period_samples = round(spec.freq * beat_period_sec);
+			int beat_period_samples = round(audio_spec.freq * beat_period_sec);
 			params.crop_length_samples = std::min(((int) params.win_length_samples), beat_period_samples);
 			delete[] result;
 			result = new double[params.crop_length_samples];
@@ -108,8 +108,8 @@ public:
 	BPSW_Spec& params;
 	std::deque<std::vector<float>> data_lookback_beats;
 
-	BandpassStandingWave (SDL_AudioSpec const& spec, BPSW_Spec& params) :
-		VisualizationHandler(spec),
+	BandpassStandingWave (SDL_AudioSpec const& audio_spec, BPSW_Spec& params) :
+		VisualizationHandler(audio_spec),
 		rollingWindow(params.win_length_samples, 0, params.win_window_fn),
 		fftHandler(params.win_length_samples),
 		should_weigh(params.fft_freq_weighing != NULL),
@@ -120,7 +120,7 @@ public:
 		// assert(params.win_length_samples >= (params.crop_length_samples + params.crop_offset),
 		std::cout << "Initilizing BPSW with win_length_samples=" << params.win_length_samples << " and crop_length_samples=" << params.crop_length_samples << std::endl;
 
-		if (spec.samples > params.win_length_samples) {
+		if (audio_spec.samples > params.win_length_samples) {
 			throw std::invalid_argument("Window cannot be shorter than samples per update");
 		}
 	}

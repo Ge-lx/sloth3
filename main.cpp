@@ -137,7 +137,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
     // we create the application's window
-    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "RTGPProject", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "Sloth3", nullptr, nullptr);
     if (!window)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -203,15 +203,20 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             frame_counter = 0;
         }
 
-        SampleT* const buf = ringBuffer->dequeue_dirty();
-        last_frame = clk::now();
+        try {
+            SampleT* const buf = ringBuffer->dequeue_dirty();
+            last_frame = clk::now();
 
-        for (size_t i = 0; i < spec.samples; i++) {
-            mono[i] = buf[2*i] / ((double) std::pow(2, 16));//(buf[2*i] + buf[2*i + 1]) / ((double) std::pow(2, 17));
+            for (size_t i = 0; i < spec.samples; i++) {
+                mono[i] = buf[2*i] / ((double) std::pow(2, 16));//(buf[2*i] + buf[2*i + 1]) / ((double) std::pow(2, 17));
+            }
+
+            memset(buf, spec.silence, spec.channels * sizeof(SampleT) * spec.samples);
+            ringBuffer->enqueue_clean(buf);
+        } catch (const timeout_exception& e) {
+            std::cout << "RingBuffer is draining!" << std::endl;
+            break;
         }
-
-        memset(buf, spec.silence, spec.channels * sizeof(SampleT) * spec.samples);
-        ringBuffer->enqueue_clean(buf);
 
         // Maximum filter
         double maxval = math::max_value(mono, spec.samples);
@@ -372,7 +377,13 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     glfwTerminate();
 
 
+    printf("\n\nStopping visualization threads\n");
+    for (size_t i = 0; i < num_handlers; i++) {
+        handlers[i]->stop_thread();
+    }
+
     printf("\n\nStopping audio stream and deconstructing.\n");
+    ringBuffer->drain();
     stop_audio_stream();
 
     delete ringBuffer;
@@ -382,7 +393,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 }
 
 int main (int argc, char** argv) {
-    std::cout << "Starting sloth2 realtime audio visualizer..." << std::endl;
+    std::cout << "Starting sloth3 realtime audio visualizer..." << std::endl;
 
     using namespace audio;
     sdl_init();
@@ -393,7 +404,7 @@ int main (int argc, char** argv) {
     } else {
         auto device_names = get_audio_device_names();
         std::cout << "\nNo audio device specified. Please choose one!" << std::endl;
-        std::cout << "Usage: \"./sloth2 <device_id>\"\n" << std::endl;
+        std::cout << "Usage: \"./sloth3 <device_id>\"\n" << std::endl;
         std::cout << "Available devices:" << std::endl;
         for (size_t i = 0; i < device_names.size(); i++) {
             std::cout << "\t" << i << ": " << device_names[i] << std::endl;
@@ -427,8 +438,8 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = false,
-        .fft_dispersion = 0.1,
-        .fft_phase = BPSW_Phase::Standing,
+        .fft_dispersion = 2.1343,
+        .fft_phase = BPSW_Phase::Constant,
         .fft_phase_const = 2.14313,
         .crop_length_samples = window_length_samples,
         .crop_offset = 0,
@@ -484,6 +495,8 @@ int main (int argc, char** argv) {
 
     int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
     std::cout << "Mainloop ended" << std::endl;
+    delete[] freq_weighing;
+    delete[] freq_weighing_inner;
     return retval;
 }
 
