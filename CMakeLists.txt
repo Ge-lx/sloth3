@@ -5,6 +5,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/third_party/cmake_modules")
 
 file(WRITE ${CMAKE_CURRENT_LIST_DIR}/graphics/shader_locations.h
 "#include \"glad.h\"
@@ -13,12 +14,13 @@ const GLchar* SHADER_VERTEX = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/verte
 "
 )
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -DUSE_FFTW") # USE_FFTW is used in BTrack
+set(CMAKE_CXX_FLAGS "-std=c++20 -Wall -Wextra -DUSE_FFTW") # USE_FFTW is used in BTrack
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(FFTW3_LIBRARY "")
 set(FFTW3_INCLUDE_DIR "third_party/fftw-3.3.10")
+include_directories("${FFTW3_INCLUDE_DIR}")
 add_subdirectory(third_party/fftw-3.3.10)
 
 set(BUILD_TESTS OFF)
@@ -32,10 +34,12 @@ add_subdirectory(third_party/SDL)
 add_library(glad third_party/glad/glad.c)
 target_include_directories(glad PUBLIC third_party/glad)
 
+find_package(GLFW3 3.3 REQUIRED)
+
 add_library(imgui third_party/imgui/imgui.cpp third_party/imgui/imgui_demo.cpp third_party/imgui/imgui_draw.cpp third_party/imgui/imgui_tables.cpp third_party/imgui/imgui_widgets.cpp third_party/imgui/backends/imgui_impl_glfw.cpp third_party/imgui/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui PUBLIC third_party/imgui)
+target_include_directories(imgui PUBLIC "$(GLFW3_INCLUDE_DIR)")
 
-find_package(glfw3 3.3 REQUIRED)
 
 add_library(fft util/fft_handler.cpp)
 target_include_directories(fft PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third_party/fftw-3.3.10/api)
