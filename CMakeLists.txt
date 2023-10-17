@@ -49,6 +49,5 @@ set_target_properties(util PROPERTIES LINKER_LANGUAGE CXX)
 
 add_executable(sloth3 main.cpp)
 target_include_directories(sloth3 PUBLIC third_party/linmath)
-# target_include_directories(sloth3 PUBLIC "${SDL_INCLUDE_DIR}")
 
 target_link_libraries(sloth3 util SDL2 fft BTrack glad imgui)
