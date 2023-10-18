@@ -45,8 +45,8 @@ LineParams read_params (int idx)
     parsed.radius_base = texelFetch(params, idx * 8 + 3).r;
     parsed.radius_scale = texelFetch(params, idx * 8 + 4).r;
     parsed.data_end_idx = texelFetch(params, idx * 8 + 5).r;
-    parsed.buffer_length = uint(texelFetch(params, idx * 8 + 6).r);
-    parsed.num_aux_lines = uint(texelFetch(params, idx * 8 + 7).r);
+    parsed.buffer_length = floatBitsToUint(texelFetch(params, idx * 8 + 6).r);
+    parsed.num_aux_lines = floatBitsToUint(texelFetch(params, idx * 8 + 7).r);
     return parsed;
 }
 
