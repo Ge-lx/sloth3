@@ -179,12 +179,34 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
     // we create the Shader Programs used in the application
     Shader mainShader(SHADER_VERTEX, SHADER_FRAGMENT);
-    GLuint ssbo_data;
+
     GLuint ssbo_params;
-    GLuint ssbo_aux_data;
-    glGenBuffers(1, &ssbo_data);
     glGenBuffers(1, &ssbo_params);
+    glBindBuffer(GL_TEXTURE_BUFFER, ssbo_params);
+    glBufferData(GL_TEXTURE_BUFFER, 10 * sizeof(LineParams), NULL, GL_STREAM_DRAW);
+
+    GLuint ssbo_data;
+    glGenBuffers(1, &ssbo_data);
+    glBindBuffer(GL_TEXTURE_BUFFER, ssbo_data);
+    glBufferData(GL_TEXTURE_BUFFER, 600000 * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+
+    GLuint ssbo_aux_data;
     glGenBuffers(1, &ssbo_aux_data);
+    glBindBuffer(GL_TEXTURE_BUFFER, ssbo_aux_data);
+    glBufferData(GL_TEXTURE_BUFFER, 600000 * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+
+    GLuint tex_buf_data;
+    glGenTextures(1, &tex_buf_data);
+
+    GLuint tex_buf_params;
+    glGenTextures(1, &tex_buf_params);
+
+    GLuint tex_buf_aux_data;
+    glGenTextures(1, &tex_buf_aux_data);
+    // glUniform1i(glGetUniformLocation(mainShader.Program, "params"), 0);
+    // glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples"), 1);
+    // glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples_aux"), 2);
+
     glfwMakeContextCurrent(window);
 
     // Rendering loop
@@ -310,21 +332,46 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_1_s"), delta_time_1_s);
         glUniform1f(glGetUniformLocation(mainShader.Program, "period_s"), period_s);
         glUniform4f(glGetUniformLocation(mainShader.Program, "color_bg"), color_bg[0], color_bg[1], color_bg[2], color_bg[3]);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_params);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, num_handlers * sizeof(LineParams), params, GL_STATIC_READ);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_params);
+        glUniform1i(glGetUniformLocation(mainShader.Program, "num_lines"), num_handlers);
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_data);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, total_length * sizeof(GLfloat), results_concat, GL_STATIC_READ);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo_data);
+        glBindBuffer(GL_TEXTURE_BUFFER, ssbo_params);
+        glBufferSubData(GL_TEXTURE_BUFFER, 0, num_handlers * sizeof(LineParams), params);
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_aux_data);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, aux_buffer_total_length * sizeof(GLfloat), aux_buffers_concat, GL_STATIC_READ);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_aux_data);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_BUFFER, tex_buf_params);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_params);
+        glUniform1i(glGetUniformLocation(mainShader.Program, "params"), tex_buf_params);
+        std::cout << "params location: " << glGetUniformLocation(mainShader.Program, "params") << std::endl;
+
+        // ---------------
+
+        glBindBuffer(GL_TEXTURE_BUFFER, ssbo_data);
+        glBufferSubData(GL_TEXTURE_BUFFER, 0, total_length * sizeof(GLfloat), results_concat);
+
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_BUFFER, tex_buf_data);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_data);
+        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples"), tex_buf_data);
+        std::cout << "data_samples location: " << glGetUniformLocation(mainShader.Program, "data_samples") << std::endl;
+
+        // ---------------
+
+        glBindBuffer(GL_TEXTURE_BUFFER, ssbo_aux_data);
+        glBufferSubData(GL_TEXTURE_BUFFER, 0, aux_buffer_total_length * sizeof(GLfloat), aux_buffers_concat);
+
+        glActiveTexture(GL_TEXTURE0 + 2);
+        glBindTexture(GL_TEXTURE_BUFFER, tex_buf_aux_data);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_aux_data);
+        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples_aux"), tex_buf_aux_data);
+        std::cout << "data_samples_aux location: " << glGetUniformLocation(mainShader.Program, "data_samples_aux") << std::endl;
+
 
         glfw_render_texture();
 
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR) {
+            std::cout << "Error: " << err << std::endl;
+        }
         /////////////////////////////////// IMGUI INTERFACE /////////////////////////////////////////////////////////////////////////////
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
