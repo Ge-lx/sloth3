@@ -340,8 +340,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_BUFFER, tex_buf_params);
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_params);
-        glUniform1i(glGetUniformLocation(mainShader.Program, "params"), tex_buf_params);
-        std::cout << "params location: " << glGetUniformLocation(mainShader.Program, "params") << std::endl;
+        glUniform1i(glGetUniformLocation(mainShader.Program, "params"), 0);
 
         // ---------------
 
@@ -351,8 +350,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glActiveTexture(GL_TEXTURE0 + 1);
         glBindTexture(GL_TEXTURE_BUFFER, tex_buf_data);
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_data);
-        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples"), tex_buf_data);
-        std::cout << "data_samples location: " << glGetUniformLocation(mainShader.Program, "data_samples") << std::endl;
+        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples"), 1);
 
         // ---------------
 
@@ -362,8 +360,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glActiveTexture(GL_TEXTURE0 + 2);
         glBindTexture(GL_TEXTURE_BUFFER, tex_buf_aux_data);
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, ssbo_aux_data);
-        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples_aux"), tex_buf_aux_data);
-        std::cout << "data_samples_aux location: " << glGetUniformLocation(mainShader.Program, "data_samples_aux") << std::endl;
+        glUniform1i(glGetUniformLocation(mainShader.Program, "data_samples_aux"), 2);
 
 
         glfw_render_texture();
