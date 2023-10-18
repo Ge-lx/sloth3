@@ -96,7 +96,7 @@ private:
 
 	void get_result (float* output) {
 		for (size_t i = 0; i < params.crop_length_samples; i++) {
-			output[i] = 0.5f;//result[i];
+			output[i] = result[i];
 		}
 	}
 

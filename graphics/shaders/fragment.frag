@@ -73,7 +73,7 @@ vec4 color_pattern_fill (vec2 coord_polar, vec4 base_color, vec4 accet_color)
 
 // vec4 test (vec2 coord)
 // {
-//     return texelFetch(params, int(coord[0] * 100));
+//     return texelFetch(data_samples, int(coord[0] * 1920));
 // }
 
 void main()
@@ -93,42 +93,42 @@ void main()
     frag_color = color_bg;
 
     // Outer lines begin
-    // LineParams params_0 = read_params(0);
-    // int offset = 0;
-    // for (int i = int(params_0.num_aux_lines); i >= 0; i--) {
-    //     int num_samples = int(params_0.buffer_length);
+    LineParams params_0 = read_params(0);
+    int offset = 0;
+    for (int i = int(params_0.num_aux_lines); i >= 0; i--) {
+        int num_samples = int(params_0.buffer_length);
 
-    //     float angle_step_size = 2 * PI / (float(num_samples) - 1);
-    //     float index_float = angle / angle_step_size;
+        float angle_step_size = 2 * PI / (float(num_samples) - 1);
+        float index_float = angle / angle_step_size;
 
-    //     int data_index_lower = int(index_float);
-    //     int data_index_upper = (data_index_lower + 1) % num_samples;
+        int data_index_lower = int(index_float);
+        int data_index_upper = (data_index_lower + 1) % num_samples;
 
-    //     float data_lower = 0.0;
-    //     float data_upper = 0.0;
-    //     if (i == params_0.num_aux_lines) {
-    //         data_lower = texelFetch(data_samples, offset + data_index_lower).r;
-    //         data_upper = texelFetch(data_samples, offset + data_index_upper).r;
-    //     } else {
-    //         data_lower = texelFetch(data_samples_aux, offset + data_index_lower).r;
-    //         data_upper = texelFetch(data_samples_aux, offset + data_index_upper).r;
-    //     }
+        float data_lower = 0.0;
+        float data_upper = 0.0;
+        if (i == params_0.num_aux_lines) {
+            data_lower = texelFetch(data_samples, offset + data_index_lower).r;
+            data_upper = texelFetch(data_samples, offset + data_index_upper).r;
+        } else {
+            data_lower = texelFetch(data_samples_aux, offset + data_index_lower).r;
+            data_upper = texelFetch(data_samples_aux, offset + data_index_upper).r;
+        }
 
-    //     float alpha = index_float - data_index_lower;
-    //     float result = mix(data_upper, data_lower, alpha);
-    //     float target_radius = params_0.radius_base + params_0.radius_scale * result;
-    //     if (i != params_0.num_aux_lines) { // Last index is outline of main wobble
-    //         float beat_fraction = delta_time_1_s / period_s;
-    //         target_radius = target_radius + (beat_fraction + i) * float(period_s) / (float(period_s) * 4);
-    //     }
+        float alpha = index_float - data_index_lower;
+        float result = mix(data_upper, data_lower, alpha);
+        float target_radius = params_0.radius_base + params_0.radius_scale * result;
+        if (i != params_0.num_aux_lines) { // Last index is outline of main wobble
+            float beat_fraction = delta_time_1_s / period_s;
+            target_radius = target_radius + (beat_fraction + i) * float(period_s) / (float(period_s) * 4);
+        }
 
-    //     float err = gauss_peak(abs(radius - target_radius), 0, i == params_0.num_aux_lines ? 0.001 : 0.0005);
-    //     frag_color = frag_color + mix(transparent, vec4(1.0, 1.0, 1.0, 1.0), err);
+        float err = gauss_peak(abs(radius - target_radius), 0, i == params_0.num_aux_lines ? 0.001 : 0.0005);
+        frag_color = frag_color + mix(transparent, vec4(1.0, 1.0, 1.0, 1.0), err);
 
-    //     if (i != params_0.num_aux_lines) {
-    //         offset = offset + int(params_0.buffer_length);
-    //     }
-    // }
+        if (i != params_0.num_aux_lines) {
+            offset = offset + int(params_0.buffer_length);
+        }
+    }
     // Outer lines end
 
 
@@ -148,7 +148,7 @@ void main()
         float alpha = index_float - data_index_lower;
 
         float result = mix(data_upper, data_lower, alpha);
-        float target_radius = 0.1 * (i+1) + 0.2 * result;
+        float target_radius = params_i.radius_base + params_i.radius_scale * result;
         float err = radius - target_radius;
 
         if (err < 0.0) {

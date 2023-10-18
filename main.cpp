@@ -193,7 +193,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     GLuint ssbo_aux_data;
     glGenBuffers(1, &ssbo_aux_data);
     glBindBuffer(GL_TEXTURE_BUFFER, ssbo_aux_data);
-    glBufferData(GL_TEXTURE_BUFFER, 600000 * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, 60000000 * sizeof(GLfloat), NULL, GL_STREAM_DRAW);
 
     GLuint tex_buf_data;
     glGenTextures(1, &tex_buf_data);
