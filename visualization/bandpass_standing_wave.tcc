@@ -51,7 +51,7 @@ private:
 
 	    // Convert to polar basis
 	    const size_t c_length = params.win_length_samples / 2 + 1;
-	    double* abs_vals = new double[c_length];
+	    double* abs_vals = new double[c_length]; // Allocation inside hot path. Refactor into class members.
 	    double* arg_vals = new double[c_length];
 	    for (size_t i = 0; i < c_length; i++) {
 	        std::complex<double> c(fftHandler.complex[i][0], fftHandler.complex[i][1]);
@@ -82,7 +82,7 @@ private:
 	        fftHandler.complex[i][0] = std::real(c);
 	        fftHandler.complex[i][1] = std::imag(c);
 	    }
-	    delete[] abs_vals;
+	    delete[] abs_vals; // See above. Allocation in hot path
 	    delete[] arg_vals;
 
 	    // Execute inverse fourier transformation

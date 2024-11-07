@@ -69,11 +69,27 @@ namespace math {
 		return min;
 	}
 
+	// args:
+	// T* values: the destination array
+	// bool periodic : makes "T stop" exclusive
 	template <typename T>
 	void lin_space (T* values, size_t len, T start, T stop, bool periodic = false, T step = 1) {
+		assert(start + (len - 1) * step <= stop);
 		T const norm_step = step * (stop - start) / ((double) len - (periodic ? 1 : 0));
 		for (size_t i = 0; i < len; i++) {
 			values[i] = start + i * norm_step;
+		}
+	}
+
+	// Values needs to be of size (n//2 + 1)
+	// See https://fftw.org/fftw3.pdf page 13
+	// Uses algorithm as in https://numpy.org/doc/stable/reference/generated/numpy.fft.rfftfreq.html
+	void freqs_for_dft_r2c (double* const values, size_t n, size_t sample_rate) {
+		size_t const num_bins = n / 2; // Rounded down on purpose
+		double const scale = n / ((double) sample_rate);
+		lin_space<double>(values, num_bins + 1, 0, num_bins, false, 1);
+		for (size_t i = 0; i < num_bins + 1; i++) {
+			values[i] /= scale;
 		}
 	}
 } // namespace math

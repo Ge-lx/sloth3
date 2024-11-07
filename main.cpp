@@ -495,9 +495,13 @@ int main (int argc, char** argv) {
     };
     size_t c_length = params.win_length_samples / 2 + 1;
     double* freq_weighing = new double[c_length];
+    double* freq_bins = new double[c_length];
+    math::freqs_for_dft_r2c(freq_bins, params.win_length_samples, (size_t) spec.freq);
+    std::cout << "Freq bins:" << std::endl;
     for (size_t i = 0; i < c_length; i++) {
+        std::cout << freq_bins[i] << " | " << i << std::endl;
         freq_weighing[i] = i < 10 ? 1.5 :
-                           i < 40 ? 1 : 0.05;
+                           i < 42 ? 1 : 0.05;
     }
     params.fft_freq_weighing = freq_weighing;
 
@@ -519,7 +523,7 @@ int main (int argc, char** argv) {
     size_t c_length_i = params_inner.win_length_samples / 2 + 1;
     double* freq_weighing_inner = new double[c_length_i];
     for (size_t i = 0; i < c_length_i; i++) {
-        freq_weighing_inner[i] = i < 200 ? 0 : ( i > (c_length_i - 1200) ? 0 : 1);
+        freq_weighing_inner[i] = i < 42 ? 0 : ( i > (c_length_i - 1200) ? 0 : 1);
     }
     params_inner.fft_freq_weighing = freq_weighing_inner;
 
