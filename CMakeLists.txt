@@ -7,7 +7,7 @@ endif()
 
 file(WRITE ${CMAKE_CURRENT_LIST_DIR}/graphics/shader_locations.h
 "#include \"glad.h\"
-const GLchar* SHADER_FRAGMENT = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/fragment.frag\";
+const GLchar* SHADER_FRAGMENT = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/fragment_line.frag\";
 const GLchar* SHADER_VERTEX = \"${CMAKE_CURRENT_LIST_DIR}/graphics/shaders/vertex.vert\";
 "
 )

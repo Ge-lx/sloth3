@@ -31,13 +31,13 @@
 #include "util/math.tcc"
 #include "util/rolling_window.tcc"
 #include "util/sdl_audio.tcc"
-#include "visualization/bandpass_standing_wave.tcc"
+#include "visualization/bpsw_2.tcc"
 #include "graphics/shader.h"
 #include "graphics/shader_locations.h"
 
 
 // dimensions of application's window
-GLuint screenWidth = 1200, screenHeight = 1000;
+GLuint screenWidth = 1024, screenHeight = 1000;
 
 // callback functions for glfw
 void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -49,6 +49,7 @@ void glfw_render_texture();
 GLfloat pattern_scale = 4271.0f;
 GLfloat movement_scale = 10208.0f;
 GLfloat time_scale = 26000.0f;
+GLfloat num_hor_pix = screenWidth;
 GLfloat delta_time_4_s = 0.0f;
 GLfloat delta_time_1_s = 0.0f;
 GLfloat period_s = 10.0f;
@@ -69,7 +70,7 @@ struct __attribute__ ((packed)) LineParams {
     GLuint num_aux_lines;
 };
 
-LineParams build_line_params (BPSW_Spec const& spec, size_t buffer_length, size_t data_end_idx) {
+LineParams build_line_params (BPSW2_Spec const& spec, size_t buffer_length, size_t data_end_idx) {
     return LineParams{
         .color_inner_0 = spec.color_inner[0],
         .color_inner_1 = spec.color_inner[1],
@@ -93,6 +94,7 @@ void glfw_key_callback(GLFWwindow* window, int key, int /*scancode*/, int action
 void glfw_framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 {
     aspect_ratio = width / ((float) height);
+    num_hor_pix = width;
     glViewport(0, 0, width, height);
 }
 
@@ -228,7 +230,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         }
 
         // Maximum filter
-        double maxval = math::max_value(mono, spec.samples);
+        double maxval = math::max_abs_value(mono, spec.samples);
         maxval = *max_filter.update(&maxval);
         maxval = maxval > 2 ? 2 : (maxval < 0.01 ? 0.02 : maxval);
         for (size_t i = 0; i < spec.samples; i++) {
@@ -255,7 +257,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             handlers[i]->await_buffer_processed(false); // Keep lock from here
 
             int result_size = handlers[i]->get_result_size();
-            BPSW_Spec vis_params = ((BandpassStandingWave*)handlers[i])->params;
+            BPSW2_Spec vis_params = ((BPSW2*)handlers[i])->params;
             size_t data_end_idx = (i == 0 ? result_size : (params[i-1].data_end_idx + result_size));
             params[i] = build_line_params(vis_params, result_size, data_end_idx);
 
@@ -270,7 +272,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             handlers[i]->await_result(((float*)(results_concat + offset)));
 
             if (is_new_beat) {
-                auto& queue = ((BandpassStandingWave*) handlers[i])->data_lookback_beats;
+                auto& queue = ((BPSW2*) handlers[i])->data_lookback_beats;
                 queue.push_back(
                     std::vector<float>(
                         ((float*) results_concat + offset),
@@ -286,7 +288,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
         size_t aux_buffer_total_length = 0;
         for (size_t i = 0; i < num_handlers; i++) {
-            BandpassStandingWave* bpsw = ((BandpassStandingWave*) handlers[i]);
+            BPSW2* bpsw = ((BPSW2*) handlers[i]);
             params[i].num_aux_lines = bpsw->data_lookback_beats.size();
             aux_buffer_total_length += params[i].num_aux_lines * params[i].buffer_length;
         }
@@ -295,7 +297,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         GLfloat* aux_buffers_concat = new GLfloat[aux_buffer_total_length];
         size_t total_offset = 0;
         for (size_t i = 0; i < num_handlers; i++) {
-            auto& queue = ((BandpassStandingWave*) handlers[i])->data_lookback_beats;
+            auto& queue = ((BPSW2*) handlers[i])->data_lookback_beats;
             for (size_t j = 0; j < params[i].num_aux_lines; j++) {
                 size_t max_copy_len = std::min(((size_t)queue[j].size()), ((size_t)params[i].buffer_length));
                 memcpy((aux_buffers_concat + total_offset), queue[j].data(), max_copy_len * sizeof(GLfloat));
@@ -328,6 +330,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         glUniform1f(glGetUniformLocation(mainShader.Program, "pattern_scale"), pattern_scale);
         glUniform1f(glGetUniformLocation(mainShader.Program, "movement_scale"), movement_scale);
         glUniform1f(glGetUniformLocation(mainShader.Program, "time_scale"), time_scale);
+        glUniform1f(glGetUniformLocation(mainShader.Program, "num_hor_pix"), num_hor_pix);
         glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_4_s"), delta_time_4_s);
         glUniform1f(glGetUniformLocation(mainShader.Program, "delta_time_1_s"), delta_time_1_s);
         glUniform1f(glGetUniformLocation(mainShader.Program, "period_s"), period_s);
@@ -470,74 +473,94 @@ int main (int argc, char** argv) {
     spec.freq = 48000;
     spec.channels = 2;
 
+    const static size_t n_taps = 4097;
+    static size_t n_w = 8192 - n_taps - 1;
+    const static size_t n_dly = n_taps/2;
+    const static size_t n_fft = std::pow(2, std::ceil(std::log2(n_w + 2 * n_dly - 1)));
+    n_w = n_fft - 2 * n_dly;
+
+    const static size_t K = 8;
+    const static size_t n_hop = (n_w / K);
+
+
     const static unsigned int target_fps = 60;
     const static double update_interval_ms = 1000.0 / ((double) target_fps);
     const static double window_length_ms = 100;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;//20;
 
-    size_t window_length_samples = window_length_ms / 1000 * spec.freq;
-    spec.samples = (size_t) update_interval_ms / 1000.0 * spec.freq;
+    // size_t window_length_samples = window_length_ms / 1000 * spec.freq;
+    spec.samples = (size_t) n_hop;
 
-    BPSW_Spec params {
-        .win_length_samples = window_length_samples,
-        .update_length_samples = spec.samples,
-        .win_window_fn = true,
-        .adaptive_crop = false,
-        .fft_dispersion = 2.1343,
-        .fft_phase = BPSW_Phase::Constant,
-        .fft_phase_const = 2.14313,
-        .crop_length_samples = window_length_samples,
-        .crop_offset = 0,
-        .c_rad_base = 0.6,
-        .c_rad_extr = 0.6,
+    BPSW2_Spec params {
+        .n_w = n_w,
+        .n_hop = n_hop,
+        .n_fft = n_fft,
+        .c_rad_base = 0,
+        .c_rad_extr = 0.4,
         .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
     };
-    size_t c_length = params.win_length_samples / 2 + 1;
-    double* freq_weighing = new double[c_length];
-    double* freq_bins = new double[c_length];
-    math::freqs_for_dft_r2c(freq_bins, params.win_length_samples, (size_t) spec.freq);
-    std::cout << "Freq bins:" << std::endl;
-    for (size_t i = 0; i < c_length; i++) {
-        std::cout << freq_bins[i] << " | " << i << std::endl;
-        freq_weighing[i] = i < 10 ? 1.5 :
-                           i < 42 ? 1 : 0.05;
-    }
-    params.fft_freq_weighing = freq_weighing;
+
+    // BPSW_Spec params {
+    //     .win_length_samples = window_length_samples,
+    //     .update_length_samples = spec.samples,
+    //     .win_window_fn = true,
+    //     .adaptive_crop = false,
+    //     .fft_dispersion = 2.1343,
+    //     .fft_phase = BPSW_Phase::Constant,
+    //     .fft_phase_const = 2.14313,
+    //     .crop_length_samples = window_length_samples,
+    //     .crop_offset = 0,
+    //     .c_rad_base = 0.6,
+    //     .c_rad_extr = 0.6,
+    //     .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
+    // };
+    // size_t c_length = params.win_length_samples / 2 + 1;
+    // double* freq_weighing = new double[c_length];
+    // double* freq_bins = new double[c_length];
+    // math::freqs_for_dft_r2c(freq_bins, params.win_length_samples, (size_t) spec.freq);
+    // std::cout << "Freq bins:" << std::endl;
+    // for (size_t i = 0; i < c_length; i++) {
+    //     std::cout << freq_bins[i] << " | " << i << std::endl;
+    //     freq_weighing[i] = i < 10 ? 1.5 :
+    //                        i < 42 ? 1 : 0.05;
+    // }
+    // params.fft_freq_weighing = freq_weighing;
 
 
-    BPSW_Spec params_inner {
-        .win_length_samples = window_length_samples,
-        .update_length_samples = spec.samples,
-        .win_window_fn = true,
-        .adaptive_crop = false,
-        .fft_dispersion = -0.1, // -0.1
-        .fft_phase = BPSW_Phase::Standing,
-        .fft_phase_const = 0.8,
-        .crop_length_samples = (window_length_samples) - 800,
-        .crop_offset = 400,
-        .c_rad_base = 0.3,
-        .c_rad_extr = 1.8,
-        .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
-    };
-    size_t c_length_i = params_inner.win_length_samples / 2 + 1;
-    double* freq_weighing_inner = new double[c_length_i];
-    for (size_t i = 0; i < c_length_i; i++) {
-        freq_weighing_inner[i] = i < 42 ? 0 : ( i > (c_length_i - 1200) ? 0 : 1);
-    }
-    params_inner.fft_freq_weighing = freq_weighing_inner;
+    // BPSW_Spec params_inner {
+    //     .win_length_samples = window_length_samples,
+    //     .update_length_samples = spec.samples,
+    //     .win_window_fn = true,
+    //     .adaptive_crop = false,
+    //     .fft_dispersion = -0.1, // -0.1
+    //     .fft_phase = BPSW_Phase::Standing,
+    //     .fft_phase_const = 0.8,
+    //     .crop_length_samples = (window_length_samples) - 800,
+    //     .crop_offset = 400,
+    //     .c_rad_base = 0.3,
+    //     .c_rad_extr = 1.8,
+    //     .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
+    // };
+    // size_t c_length_i = params_inner.win_length_samples / 2 + 1;
+    // double* freq_weighing_inner = new double[c_length_i];
+    // for (size_t i = 0; i < c_length_i; i++) {
+    //     freq_weighing_inner[i] = i < 42 ? 0 : ( i > (c_length_i - 1200) ? 0 : 1);
+    // }
+    // params_inner.fft_freq_weighing = freq_weighing_inner;
 
 
     /* -------------------- CONFIGURATION END ----------------------------- */
 
     printf("Instantiating visualizations\n");
-    BandpassStandingWave bpsw {spec, params};
-    BandpassStandingWave bpsw_inner {spec, params_inner};
+    // BandpassStandingWave bpsw {spec, params};
+    // BandpassStandingWave bpsw_inner {spec, params_inner};
+    BPSW2 bpsw (spec, params);
     printf("Done\n");
 
-    constexpr size_t num_handlers = 2;
+    constexpr size_t num_handlers = 1;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw, &bpsw_inner/*, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw/*, &bpsw_inner, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
@@ -545,8 +568,8 @@ int main (int argc, char** argv) {
 
     int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms, target_fps);
     std::cout << "Mainloop ended" << std::endl;
-    delete[] freq_weighing;
-    delete[] freq_weighing_inner;
+    // delete[] freq_weighing;
+    // delete[] freq_weighing_inner;
     return retval;
 }
 

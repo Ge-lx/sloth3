@@ -28,7 +28,7 @@ public:
 		}
 
 	    for (size_t i = 0; i < window_length_samples; i++) {
-	        window_function[i] = (.5 * (1 - std::cos(2*M_PI*i)/(window_length_samples)));
+	        window_function[i] = .5 - 0.5 * std::cos((2*M_PI*i)/((double) window_length_samples));
 	    }
 	}
 

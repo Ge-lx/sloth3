@@ -48,6 +48,15 @@ namespace math {
 	}
 
 	template <typename T>
+	T max_abs_value (T* const values, size_t len) {
+		T max = abs(values[0]);
+		for (size_t i = 1; i < len; i++) {
+			max = abs(values[i]) > max ? abs(values[i]) : max;
+		}
+		return max;
+	}
+
+	template <typename T>
 	size_t max_value_arg (T* const values, size_t len) {
 		T max = values[0];
 		size_t arg = 0;
