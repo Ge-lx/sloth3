@@ -96,7 +96,7 @@ namespace math {
 	void freqs_for_dft_r2c (double* const values, size_t n, size_t sample_rate) {
 		size_t const num_bins = n / 2; // Rounded down on purpose
 		double const scale = n / ((double) sample_rate);
-		lin_space<double>(values, num_bins + 1, 0, num_bins, false, 1);
+		lin_space<double>(values, num_bins + 1, 0, num_bins, true, 1);
 		for (size_t i = 0; i < num_bins + 1; i++) {
 			values[i] /= scale;
 		}
