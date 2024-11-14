@@ -42,7 +42,7 @@ public:
 		const size_t window_len_bytes = window_length_samples * sample_bytes;
 		const size_t update_len_bytes = update_length * sample_bytes;
 
-		index = is_new_beat ? update_length : index + update_length;
+		index = /* is_new_beat ? update_length : */ index + update_length;
 		// index %= window_length_samples;
 		last_update_samples = update_length;
 

@@ -473,13 +473,13 @@ int main (int argc, char** argv) {
     spec.freq = 48000;
     spec.channels = 2;
 
-    const static size_t n_taps = 4097;
-    static size_t n_w = 8192 - n_taps - 1;
+    const static size_t n_taps = 8193;
+    static size_t n_w = 16384 - n_taps - 1;
     const static size_t n_dly = n_taps/2;
     const static size_t n_fft = std::pow(2, std::ceil(std::log2(n_w + 2 * n_dly - 1)));
     n_w = n_fft - 2 * n_dly;
 
-    const static size_t K = 8;
+    const static size_t K = 16;
     const static size_t n_hop = (n_w / K);
 
 

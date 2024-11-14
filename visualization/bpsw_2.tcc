@@ -51,19 +51,25 @@ private:
 		const double pi = std::acos(-1.0);
 		// const double bin_phase = params.n_fft / 2 / audio_spec.freq; // index_last / ((double) params.n_w);
 
-		const double relative_time_shift = index_last / audio_spec.freq;
+		const double samples_shift = ((index_last % params.n_w) /* / ((double)params.n_fft)) */);
 		double* freq_bins = new double[c_length];
-		math::freqs_for_dft_r2c(freq_bins, params.n_w, audio_spec.freq);
+		double* abs_vals = new double[c_length];
+		math::freqs_for_dft_r2c(freq_bins, params.n_fft, audio_spec.freq);
+		for (size_t i = 0; i < c_length; i++) {
+			abs_vals[i] = std::abs(data_complex[i]);
+		}
+		size_t idx_max = math::max_value_arg(abs_vals, c_length);
 		for (size_t i = 0; i < c_length; i++) {
 			using namespace std::complex_literals;
-			double zero_offset = params.n_fft / 2 * freq_bins[i] / audio_spec.freq;
-			double bin_phase = zero_offset;
+			double zero_offset = /* 0.5 + */ params.n_fft / 4 * (freq_bins[i] / audio_spec.freq);
+			double bin_phase = zero_offset - samples_shift * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
 			// data_complex[i] *= std::exp(2i * pi * freq_bins[i]);
 			// data_complex[i] *= std::exp(-2i * pi * bin_phase);
-			data_complex[i] = std::abs(data_complex[i]) * std::exp(1i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
+			data_complex[i] = /* std::abs( */data_complex[i] * std::exp(2i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
 		}
 
 		delete[] freq_bins;
+		delete[] abs_vals;
 		// if (data.is_new_beat & params.adaptive_crop) {
 		// 	double beat_period_sec = 60 / data.tempo_estimate;
 		// 	int beat_period_samples = round(audio_spec.freq * beat_period_sec);
@@ -136,7 +142,7 @@ public:
 
 	BPSW2 (SDL_AudioSpec const& audio_spec, BPSW2_Spec& params) :
 		VisualizationHandler(audio_spec),
-		rollingWindow(params.n_w, 0, true),
+		rollingWindow(params.n_w, 0, false),
 		fftHandler(params.n_fft),
 		should_weigh(false),
 		params(params)
