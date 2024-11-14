@@ -1,6 +1,8 @@
 #include "vis_handler.tcc"
 #include <stdexcept>
 #include <algorithm>
+#include <complex>
+#include <cmath>
 
 // enum BPSW_Phase { Constant, Unchanged, Standing };
 
@@ -35,14 +37,33 @@ private:
 	void visualize (VisualizationBuffer const& data) {
 
 		// Update the rolling window and
-		size_t index_last = rollingWindow.current_index();
 		double* const window_data = rollingWindow.update(data.audio_buffer, audio_spec.samples, false);
+		size_t index_last = rollingWindow.current_index();
 
         size_t idx_pad_end = (params.n_fft - params.n_w) / 2;
         std::fill(fftHandler.real, fftHandler.real + params.n_fft, double(0));
         memcpy(fftHandler.real + idx_pad_end, window_data, params.n_w * sizeof(double));
 	    fftHandler.exec_r2c();
 
+		std::complex<double>* data_complex = reinterpret_cast<std::complex<double>*>(fftHandler.complex);
+
+	    const size_t c_length = params.n_fft / 2 + 1;
+		const double pi = std::acos(-1.0);
+		// const double bin_phase = params.n_fft / 2 / audio_spec.freq; // index_last / ((double) params.n_w);
+
+		const double relative_time_shift = index_last / audio_spec.freq;
+		double* freq_bins = new double[c_length];
+		math::freqs_for_dft_r2c(freq_bins, params.n_w, audio_spec.freq);
+		for (size_t i = 0; i < c_length; i++) {
+			using namespace std::complex_literals;
+			double zero_offset = params.n_fft / 2 * freq_bins[i] / audio_spec.freq;
+			double bin_phase = zero_offset;
+			// data_complex[i] *= std::exp(2i * pi * freq_bins[i]);
+			// data_complex[i] *= std::exp(-2i * pi * bin_phase);
+			data_complex[i] = std::abs(data_complex[i]) * std::exp(1i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
+		}
+
+		delete[] freq_bins;
 		// if (data.is_new_beat & params.adaptive_crop) {
 		// 	double beat_period_sec = 60 / data.tempo_estimate;
 		// 	int beat_period_samples = round(audio_spec.freq * beat_period_sec);
@@ -56,7 +77,6 @@ private:
 		// memcpy(fftHandler.real, window_data, params.n_w * sizeof(double));
 
 	    // Convert to polar basis
-	    // const size_t c_length = params.n_fft / 2 + 1;
 	    // double* abs_vals = new double[c_length]; // Allocation inside hot path. Refactor into class members.
 	    // double* arg_vals = new double[c_length];
 	    // for (size_t i = 0; i < c_length; i++) {
