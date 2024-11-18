@@ -59,7 +59,7 @@ private:
 			abs_vals[i] = std::abs(data_complex[i]);
 		}
 		size_t idx_max = math::max_value_arg(abs_vals, c_length);
-		for (size_t i = 0; i < c_length; i++) {
+		for (size_t i = 0; i < c_length/20; i++) {
 			using namespace std::complex_literals;
 			double zero_offset = 0.25 + params.n_fft / 2 * (freq_bins[i] / audio_spec.freq);
 			double bin_phase = zero_offset; //- samples_shift * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
