@@ -61,11 +61,11 @@ private:
 		size_t idx_max = math::max_value_arg(abs_vals, c_length);
 		for (size_t i = 0; i < c_length; i++) {
 			using namespace std::complex_literals;
-			double zero_offset = /* 0.5 + */ params.n_fft / 4 * (freq_bins[i] / audio_spec.freq);
-			double bin_phase = zero_offset - samples_shift * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
+			double zero_offset = 0.25 + params.n_fft / 2 * (freq_bins[i] / audio_spec.freq);
+			double bin_phase = zero_offset; //- samples_shift * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
 			// data_complex[i] *= std::exp(2i * pi * freq_bins[i]);
 			// data_complex[i] *= std::exp(-2i * pi * bin_phase);
-			data_complex[i] = /* std::abs( */data_complex[i] * std::exp(2i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
+			data_complex[i] = std::abs(data_complex[i]) * std::exp(2i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
 		}
 
 		delete[] freq_bins;
@@ -142,7 +142,7 @@ public:
 
 	BPSW2 (SDL_AudioSpec const& audio_spec, BPSW2_Spec& params) :
 		VisualizationHandler(audio_spec),
-		rollingWindow(params.n_w, 0, false),
+		rollingWindow(params.n_w, 0, true),
 		fftHandler(params.n_fft),
 		should_weigh(false),
 		params(params)
