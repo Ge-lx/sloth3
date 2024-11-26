@@ -446,13 +446,22 @@ int main (int argc, char** argv) {
     using namespace audio;
     sdl_init();
 
+    auto device_names = get_audio_device_names();
+    auto print_and_exit = false;
     uint16_t device_id = 0;
     if (argc > 1) {
-	   device_id = atoi(argv[1]);
+        device_id = atoi(argv[1]);
+        if (device_id >= device_names.size()) {
+            std::cout << "\nInvalid device_id" << std::endl;
+            print_and_exit = true;
+        }
     } else {
-        auto device_names = get_audio_device_names();
         std::cout << "\nNo audio device specified. Please choose one!" << std::endl;
         std::cout << "Usage: \"./sloth3 <device_id>\"\n" << std::endl;
+        print_and_exit = true;
+    }
+
+    if (print_and_exit) {
         std::cout << "Available devices:" << std::endl;
         for (size_t i = 0; i < device_names.size(); i++) {
             std::cout << "\t" << i << ": " << device_names[i] << std::endl;
