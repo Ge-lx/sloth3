@@ -299,7 +299,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
         for (size_t i = 0; i < num_handlers; i++) {
             auto& queue = ((BPSW2*) handlers[i])->data_lookback_beats;
             for (size_t j = 0; j < params[i].num_aux_lines; j++) {
-                size_t max_copy_len = std::min(((size_t)queue[j].size()), ((size_t)params[i].buffer_length));
+                size_t max_copy_len = std::min(((size_t) queue[j].size()), ((size_t) params[i].buffer_length));
                 memcpy((aux_buffers_concat + total_offset), queue[j].data(), max_copy_len * sizeof(GLfloat));
                 total_offset += params[i].buffer_length;
             }
@@ -505,6 +505,7 @@ int main (int argc, char** argv) {
         .n_w = n_w,
         .n_hop = n_hop,
         .n_fft = n_fft,
+        .f_xover = 1000,
         .c_rad_base = 0,
         .c_rad_extr = 0.4,
         .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
