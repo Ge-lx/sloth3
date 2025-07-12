@@ -1,6 +1,9 @@
 #include <cmath>
 #include <stdexcept>
 
+#ifndef MATH_H
+#define MATH_H
+
 namespace math {
 
 	template <typename T>
@@ -102,3 +105,5 @@ namespace math {
 		}
 	}
 } // namespace math
+
+#endif

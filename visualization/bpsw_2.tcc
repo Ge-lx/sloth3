@@ -1,22 +1,22 @@
-#include "vis_handler.tcc"
 #include <stdexcept>
 #include <algorithm>
 #include <complex>
 #include <cmath>
 
-// enum BPSW_Phase { Constant, Unchanged, Standing };
+#include "vis_handler.tcc"
+#include "../util/rolling_window.tcc"
+#include "../util/rolling_window.tcc"
+#include "../util/fft_handler.h"
+#include "../util/math.tcc"
 
 struct BPSW2_Spec {
 	size_t n_w; // Window length in samples
 	size_t n_hop; // Update length in samples
     size_t n_fft; // FFT size in samples (also result size)
 
-    // Crossover-frequency target between standing (zero-phase)
-    // and unchanged phase representation
-    size_t f_xover;
+	double* fft_freq_weighing = NULL; // abs(fft(window)) weighing
 
-	double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
-	float color_inner[4]; // Inner color of the circle
+    DisplayParams display_params;
 };
 
 class BPSW2 : public VisualizationHandler {
@@ -29,7 +29,7 @@ private:
 	double* freq_bins;
 
     size_t c_length;
-	bool const should_weigh = false;
+    bool should_weigh;
 
 	void visualize (VisualizationBuffer const& data) {
 
@@ -46,21 +46,23 @@ private:
 		// const double bin_phase = params.n_fft / 2 / audio_spec.freq; // index_last / ((double) params.n_w);
 
 		size_t index_last = rollingWindow.current_index();
-		const double samples_shift = ((index_last % params.n_w) /* / ((double)params.n_fft)) */);
+		const double samples_shift = 16 * ((index_last % params.n_w) /* / ((double)params.n_fft)) */);
 
 		// for (size_t i = 0; i < c_length; i++) {
 		// 	abs_vals[i] = std::abs(data_complex[i]);
 		// }
 		// size_t idx_max = math::max_value_arg(abs_vals, c_length);
-
-		for (size_t i = 0; i < c_length/20; i++) {
+		const int n = 1;
+		for (size_t i = 0; i < c_length/n; i++) {
 			using namespace std::complex_literals;
 			using namespace std::numbers;
-			double zero_offset = 0.25 + params.n_fft / 2 * (freq_bins[i] / audio_spec.freq);
-			double bin_phase = zero_offset; //- samples_shift * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
+			double zero_offset = 0.25 + params.n_fft / 2.0 * (freq_bins[i] / audio_spec.freq);
+			double nl = std::pow(i, 3) / ((float) i + 2);
+			double bin_phase = zero_offset + (samples_shift + nl) * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
 			// data_complex[i] *= std::exp(2i * pi * freq_bins[i]);
 			// data_complex[i] *= std::exp(-2i * pi * bin_phase);
-			data_complex[i] = std::abs(data_complex[i]) * std::exp(2i * ((pi * bin_phase)/*  + std::arg(data_complex[i]) */));
+			double weight = should_weigh ? params.fft_freq_weighing[i] : 1;
+			data_complex[i] = weight * std::abs(data_complex[i]) * std::exp(2i * ((pi * bin_phase)));
 		}
 
 		// if (data.is_new_beat & params.adaptive_crop) {
@@ -92,14 +94,13 @@ private:
 
 public:
 	BPSW2_Spec& params;
-    std::deque<std::vector<float>> data_lookback_beats;
 
-	BPSW2 (SDL_AudioSpec const& audio_spec, BPSW2_Spec& params) :
-		VisualizationHandler(audio_spec),
+	BPSW2 (SDL_AudioSpec const& audio_spec, BPSW2_Spec& params, bool should_weigh) :
+		VisualizationHandler(audio_spec, params.display_params),
 		rollingWindow(params.n_w, 0, true),
 		fftHandler(params.n_fft),
 		c_length(params.n_fft / 2 + 1),
-		should_weigh(false),
+		should_weigh(should_weigh),
 		params(params)
 	{
 		result = new double[params.n_fft];

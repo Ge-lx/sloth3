@@ -1,4 +1,8 @@
 #include <cstring>
+#include <cmath>
+
+#ifndef ROLLING_WINDOW_H
+#define ROLLING_WINDOW_H
 
 template <typename SampleT>
 class RollingWindow {
@@ -78,3 +82,5 @@ public:
 		index = window_length_samples;
 	}
 };
+
+#endif

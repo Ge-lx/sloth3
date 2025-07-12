@@ -1,7 +1,11 @@
 #include <queue>
 #include <stdexcept>
+#include <iostream>
+
 #include <SDL2/SDL.h>
 
+#ifndef RING_BUFFER_H
+#define RING_BUFFER_H
 
 class timeout_exception : public std::runtime_error {
 public:
@@ -135,3 +139,5 @@ public:
     }
 
 };
+
+#endif

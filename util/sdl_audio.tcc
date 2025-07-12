@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include <SDL2/SDL.h>
+#include "ring_buffer.tcc"
 
 namespace audio {
 
@@ -17,7 +18,7 @@ namespace audio {
         RingBuffer<SampleT>* rBuf = (RingBuffer<SampleT>*) userdata;
         try {
             SampleT* buf = rBuf->dequeue_clean();
-            std::memcpy(buf, stream, len);
+            memcpy(buf, stream, len);
             rBuf->enqueue_dirty(buf);
         } catch (const timeout_exception& e) {
             //

@@ -1,5 +1,11 @@
-#include "vis_handler.tcc"
+#include <complex>
+#include <deque>
 #include <stdexcept>
+#include <vector>
+
+#include "vis_handler.tcc"
+#include "../util/rolling_window.tcc"
+#include "../util/fft_handler.h"
 
 enum BPSW_Phase { Constant, Unchanged, Standing };
 
@@ -17,8 +23,7 @@ struct BPSW_Spec {
 	size_t crop_length_samples; // Displayed length of the window
 	size_t crop_offset; // Display window offset
 
-	double c_rad_base, c_rad_extr; // Radius base and extrusion scaling
-	float color_inner[4]; // Inner color of the circle
+	DisplayParams display_params;
 };
 
 class BandpassStandingWave : public VisualizationHandler {
@@ -27,8 +32,6 @@ private:
 	FFTHandler fftHandler;
 	double* result;
 	bool const should_weigh = false;
-
-	SDL_Point* points;
 
 	void visualize (VisualizationBuffer const& data) {
 
@@ -61,7 +64,7 @@ private:
 
 	    // Transform polar frequency spectrum
 	    for (size_t i = 0; i < c_length; i++) {
-	        double abs_weighted = abs_vals[i] * params.fft_freq_weighing[i];
+	        double abs_weighted = should_weigh ? abs_vals[i] * params.fft_freq_weighing[i] : abs_vals[i];
 	        double bin_phase = 2 * M_PI * (index_last / ((double) params.win_length_samples));
 	        double phase_offset = 2 * M_PI * (params.fft_phase_const / ((double) params.win_length_samples));
 
@@ -106,10 +109,9 @@ private:
 
 public:
 	BPSW_Spec& params;
-	std::deque<std::vector<float>> data_lookback_beats;
 
 	BandpassStandingWave (SDL_AudioSpec const& audio_spec, BPSW_Spec& params) :
-		VisualizationHandler(audio_spec),
+		VisualizationHandler(audio_spec, params.display_params),
 		rollingWindow(params.win_length_samples, 0, params.win_window_fn),
 		fftHandler(params.win_length_samples),
 		should_weigh(params.fft_freq_weighing != NULL),

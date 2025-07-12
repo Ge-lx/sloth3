@@ -1,6 +1,9 @@
 #include <fftw3.h>
 #include <iostream>
 
+#ifndef FFT_HANDLER_H
+#define FFT_HANDLER_H
+
 class FFTHandler {
 private:
     fftw_plan plan_r2c;
@@ -17,3 +20,5 @@ public:
     void exec_r2c ();
     void exec_c2r ();
 };
+
+#endif

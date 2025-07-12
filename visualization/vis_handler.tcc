@@ -1,12 +1,20 @@
-#include <functional>
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_thread.h>
+#include <deque>
+#include <vector>
+
+#ifndef VIS_HANDLER_H
+#define VIS_HANDLER_H
 
 struct VisualizationBuffer {
 	double const* audio_buffer;
 	double tempo_estimate;
 	bool is_new_beat;
+};
+
+struct DisplayParams {
+	double base, scale; // Radius base and extrusion scaling
+	float color_inner[4]; // Inner color of the circle
 };
 
 class VisualizationHandler {
@@ -57,6 +65,9 @@ protected:
     SDL_AudioSpec const& audio_spec;
 
 public:
+	DisplayParams const& display_params;
+    std::deque<std::vector<float>> data_lookback_beats;
+
 	void stop_thread () {
 		// Send stop signal
 		SDL_LockMutex(vh_mutex);
@@ -100,8 +111,12 @@ public:
 		SDL_UnlockMutex(vh_mutex);
 	}
 
-	VisualizationHandler (SDL_AudioSpec const& audio_spec) :
-		vh_mutex(SDL_CreateMutex()), vh_cond(SDL_CreateCond()), audio_spec(audio_spec) {
+	VisualizationHandler (SDL_AudioSpec const& audio_spec, DisplayParams const& display_params) :
+		vh_mutex(SDL_CreateMutex()),
+		vh_cond(SDL_CreateCond()),
+		audio_spec(audio_spec),
+		display_params(display_params)
+	{
 		vh_thread = SDL_CreateThread(&VisualizationHandler::worker_thread, "visualization worker", (void *) this);
 	}
 
@@ -117,3 +132,5 @@ public:
         SDL_DestroyMutex(vh_mutex);
     }
 };
+
+#endif
