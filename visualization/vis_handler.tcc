@@ -60,6 +60,7 @@ private:
 
 	virtual void visualize (VisualizationBuffer const&) = 0;
 	virtual void get_result (float*) = 0;
+	virtual void on_new_beat (double tempo_estimate) = 0;
 
 protected:
     SDL_AudioSpec const& audio_spec;
@@ -79,7 +80,7 @@ public:
 		SDL_WaitThread(vh_thread, NULL);
 	}
 
-	virtual unsigned int get_result_size() = 0;
+	virtual unsigned int get_result_size () = 0;
 
 	virtual void process_ring_buffer (VisualizationBuffer const& data) final {
 		SDL_LockMutex(vh_mutex);
@@ -89,6 +90,12 @@ public:
 
         SDL_CondSignal(vh_cond);
         SDL_UnlockMutex(vh_mutex);
+	}
+
+	void handle_new_beat (double tempo_estimate) {
+		await_buffer_processed(false);
+		on_new_beat(tempo_estimate);
+		SDL_UnlockMutex(vh_mutex);
 	}
 
 	void await_buffer_processed (bool unlock = true) {

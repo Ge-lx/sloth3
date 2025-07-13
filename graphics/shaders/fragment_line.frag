@@ -183,23 +183,27 @@ void main()
         float aa_clamp = clamp(aa * 1, 0, 1);
         vec4 pure_color = frag_color;
 
-        if (i == 0) {
-            float m = clamp(log(80 * aa_clamp) * 0.5, 0, 1);
+        if (1 ==1 || i == 0) {
+            float m = clamp(exp(aa_clamp * 2) * 0.6, 0, 1);
             float m2 = clamp(abs(deviation) / 2, 0, 1);
             if (target_y > coord[1]) {
-                pure_color = mix(c1b, c1, m2);
+                pure_color = mix(c1b, c1, 1 - m);
             } else {
-                pure_color = mix(c2b, c2, m2);
+                pure_color = mix(c2b, c2, 1 - m);
             }
 
-            frag_color = pure_color;//mix(transparent, pure_color, m);
+            frag_color = mix(frag_color, pure_color, 1 - m);
         }
 
         if (close_enough) {
             if (not_over && not_under){
                 frag_color = vec4(1, 1, 1, 1);
             } else {
-                frag_color = mix(frag_color, vec4(1.0, 1.0, 1.0, 1.0), aa_clamp);
+                if (1==1 || i != 0) {
+                    frag_color = frag_color;
+                } else {
+                    frag_color = mix(frag_color, vec4(1.0, 1.0, 1.0, 1.0), aa_clamp);
+                }
             }
         }
 

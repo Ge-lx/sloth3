@@ -1,3 +1,4 @@
+#include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #include <complex>
@@ -21,8 +22,8 @@ struct BPSW2_Spec {
 
 class BPSW2 : public VisualizationHandler {
 private:
-	RollingWindow<double> rollingWindow;
-	FFTHandler fftHandler;
+	RollingWindow<double>* rollingWindow;
+	FFTHandler* fftHandler;
 
 	double* result;
 	double* abs_vals;
@@ -34,18 +35,18 @@ private:
 	void visualize (VisualizationBuffer const& data) {
 
 		// Update the rolling window
-		double* const window_data = rollingWindow.update(data.audio_buffer, audio_spec.samples, false);
+		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples, false);
         size_t idx_pad_end = (params.n_fft - params.n_w) / 2;
 
-        std::fill(fftHandler.real, fftHandler.real + params.n_fft, double(0));
-        memcpy(fftHandler.real + idx_pad_end, window_data, params.n_w * sizeof(double));
-	    fftHandler.exec_r2c();
+        std::fill(fftHandler->real, fftHandler->real + params.n_fft, double(0));
+        memcpy(fftHandler->real + idx_pad_end, window_data, params.n_w * sizeof(double));
+	    fftHandler->exec_r2c();
 
-		std::complex<double>* data_complex = reinterpret_cast<std::complex<double>*>(fftHandler.complex);
+		std::complex<double>* data_complex = reinterpret_cast<std::complex<double>*>(fftHandler->complex);
 
 		// const double bin_phase = params.n_fft / 2 / audio_spec.freq; // index_last / ((double) params.n_w);
 
-		size_t index_last = rollingWindow.current_index();
+		size_t index_last = rollingWindow->current_index();
 		const double samples_shift = 16 * ((index_last % params.n_w) /* / ((double)params.n_fft)) */);
 
 		// for (size_t i = 0; i < c_length; i++) {
@@ -57,7 +58,7 @@ private:
 			using namespace std::complex_literals;
 			using namespace std::numbers;
 			double zero_offset = 0.25 + params.n_fft / 2.0 * (freq_bins[i] / audio_spec.freq);
-			double nl = std::pow(i, 3) / ((float) i + 2);
+			double nl = std::pow(i * 2, 3) / ((float) i + 2);
 			double bin_phase = zero_offset + (samples_shift + nl) * (freq_bins[i] / audio_spec.freq); /* + 0.001 */;
 			// data_complex[i] *= std::exp(2i * pi * freq_bins[i]);
 			// data_complex[i] *= std::exp(-2i * pi * bin_phase);
@@ -74,11 +75,11 @@ private:
 		// 	std::cout << "Setting output size to " << params.crop_length_samples << " samples" << std::endl;
 		// }
 
-	    fftHandler.exec_c2r();
+	    fftHandler->exec_c2r();
 
 	    for (size_t i = 0; i < params.n_fft; i++) {
 	    	// Scaling is not preserved: irfft(rfft(x))[i] = x[i] * len(x)
-	    	result[i] = fftHandler.real[i] / params.n_w;
+	    	result[i] = fftHandler->real[i] / params.n_w;
 	    }
 	}
 
@@ -86,6 +87,10 @@ private:
 		for (size_t i = 0; i < params.n_fft; i++) {
 			output[i] = result[i];
 		}
+	}
+
+	void on_new_beat (double) {
+		return;
 	}
 
 	unsigned int get_result_size() {
@@ -97,12 +102,13 @@ public:
 
 	BPSW2 (SDL_AudioSpec const& audio_spec, BPSW2_Spec& params, bool should_weigh) :
 		VisualizationHandler(audio_spec, params.display_params),
-		rollingWindow(params.n_w, 0, true),
-		fftHandler(params.n_fft),
 		c_length(params.n_fft / 2 + 1),
 		should_weigh(should_weigh),
 		params(params)
 	{
+		rollingWindow = new RollingWindow<double>(params.n_w, 0, true);
+		fftHandler = new FFTHandler(params.n_fft);
+
 		result = new double[params.n_fft];
 		freq_bins = new double[c_length];
 		abs_vals = new double[c_length];
@@ -116,6 +122,9 @@ public:
 	}
 
 	~BPSW2 () {
+		delete rollingWindow;
+		delete fftHandler;
+
 		delete[] result;
 		delete[] freq_bins;
 		delete[] abs_vals;

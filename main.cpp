@@ -248,6 +248,12 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             .is_new_beat = is_new_beat
         };
 
+        if (is_new_beat) {
+            for (size_t i = 0; i < num_handlers; i++) {
+                handlers[i]->handle_new_beat(tempo_estimate);
+            }
+        }
+
         for (size_t i = 0; i < num_handlers; i++) {
             handlers[i]->process_ring_buffer(data);
         }
@@ -444,6 +450,7 @@ int main (int argc, char** argv) {
 
     using namespace audio;
     sdl_init();
+    init_fftw();
 
     auto device_names = get_audio_device_names();
     auto print_and_exit = false;
@@ -500,31 +507,44 @@ int main (int argc, char** argv) {
     // size_t window_length_samples = window_length_ms / 1000 * spec.freq;
     spec.samples = (size_t) n_hop;
 
-    BPSW2_Spec params2 {
+
+
+    BPSW_Spec params {
+        .win_length_samples = n_fft * 4,
+        .update_length_samples = spec.samples,
+        .win_window_fn = false,
+        .adaptive_crop = true,
+        .fft_dispersion = 0,//0.1343,
+        .fft_phase = BPSW_Phase::Standing,
+        .fft_phase_const = 0,
+        .crop_length_samples = n_fft * 4,
+        .crop_offset = 0,
+        .display_params = {
+            .base = 0.7,
+            .scale = 0.4,
+            .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
+        }
+    };
+
+    BPSW2_Spec params3 {
         .n_w = n_w,
         .n_hop = n_hop,
         .n_fft = n_fft,
         .display_params = {
-            .base = -0.3,
+            .base = 0.2,
             .scale = 0.4,
             .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
         }
     };
 
-    BPSW_Spec params {
-        .win_length_samples = n_fft,
-        .update_length_samples = spec.samples,
-        .win_window_fn = true,
-        .adaptive_crop = false,
-        .fft_dispersion = 2.1343,
-        .fft_phase = BPSW_Phase::Constant,
-        .fft_phase_const = 2.14313,
-        .crop_length_samples = n_fft,
-        .crop_offset = 0,
+    BPSW2_Spec params2 {
+        .n_w = n_w,
+        .n_hop = n_hop,
+        .n_fft = n_fft,
         .display_params = {
-            .base = 0.3,
+            .base = -0.5,
             .scale = 0.4,
-            .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
+            .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
         }
     };
 
@@ -536,24 +556,35 @@ int main (int argc, char** argv) {
     double* freq_weighing_mid = new double[c_length];
 
     double x_over = 150;
+    double x_over_high = 3500;
     double transition = 50;
     for (size_t i = 0; i < c_length; i++) {
         if (freq_bins[i] < x_over) {
             freq_weighing_low[i] = 1;
             freq_weighing_mid[i] = 0;
         } else if (freq_bins[i] < (x_over + transition)) {
-            double x = freq_bins[i] / transition;
+            double x = (freq_bins[i] - x_over) / transition;
             freq_weighing_low[i] = 1-x;
             freq_weighing_mid[i] = x;
+        } else if (freq_bins[i] < x_over_high) {
+            freq_weighing_low[i] = 0;
+            freq_weighing_mid[i] = 2;
+        } else if (freq_bins[i] < (x_over_high + transition)) {
+            double x = (freq_bins[i] - x_over_high) / transition;
+            freq_weighing_low[i] = 0;
+            freq_weighing_mid[i] = 1-x;;
         } else {
             freq_weighing_low[i] = 0;
-            freq_weighing_mid[i] = 1;
+            freq_weighing_mid[i] = 0;
         }
     }
 
     params2.fft_freq_weighing = freq_weighing_low;
-    params.fft_freq_weighing = freq_weighing_mid;
+    params3.fft_freq_weighing = freq_weighing_mid;
 
+    params.use_filter = true;
+    params.f_cutoff = x_over_high;
+    params.is_lowpass = false;
 
     // BPSW_Spec params_inner {
     //     .win_length_samples = window_length_samples,
@@ -581,6 +612,7 @@ int main (int argc, char** argv) {
 
     printf("Instantiating visualizations\n");
     BPSW2 bpsw2 (spec, params2, true);
+    BPSW2 bpsw3 (spec, params3, true);
     BandpassStandingWave bpsw {spec, params};
 
     /*
@@ -588,9 +620,9 @@ int main (int argc, char** argv) {
     */
     printf("Done\n");
 
-    constexpr size_t num_handlers = 2;
+    constexpr size_t num_handlers = 3;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw/*, &bpsw_inner, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw, &bpsw3/*, &bpsw_inner, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;

@@ -15,9 +15,9 @@ private:
 	SampleT* windowed;
 
 	size_t last_update_samples;
-    size_t index = 0;
 
 public:
+    size_t index = 0;
 	SampleT* window_function;
 
 	RollingWindow (size_t window_length_samples, SampleT const default_value, bool window = false) :
