@@ -38,12 +38,10 @@ private:
 
 	void visualize (VisualizationBuffer const& data) {
 
-		if (data.is_new_beat) std::cout << "&fftHandler: " << fftHandler << std::endl;
-
 		// Update the rolling window and
 		size_t index_last = rollingWindow->current_index();
 		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples, data.is_new_beat);
-		// index_last -= rollingWindow->last_update_length() / 2.0;
+
 		// Execute fourier transformation
 		memcpy(fftHandler->real, window_data, params.win_length_samples * sizeof(double));
 		fftHandler->exec_r2c();
@@ -103,7 +101,7 @@ private:
 	void on_new_beat (double tempo_estimate) {
 		if (params.adaptive_crop) {
 			double beat_period_sec = 60 / tempo_estimate;
-			size_t beat_period_samples = round(audio_spec.freq * beat_period_sec / 4.0);
+			size_t beat_period_samples = round(audio_spec.freq * beat_period_sec);
 
 			if (beat_period_samples == params.win_length_samples) {
 				return;
@@ -116,9 +114,6 @@ private:
 	void allocate_for_window_length (size_t window_length) {
 		params.win_length_samples = window_length;
 		params.crop_length_samples = window_length;
-
-		bool has_prev_window = (rollingWindow != NULL);
-		size_t prev_index = has_prev_window ? rollingWindow->current_index() : 0;
 
 		if (rollingWindow != NULL) delete rollingWindow;
 		if (fftHandler != NULL) delete fftHandler;
@@ -144,7 +139,7 @@ private:
 			delete[] freq_bins;
 		}
 
-		rollingWindow->index = prev_index;
+		rollingWindow->index = params.win_length_samples/2;
 	}
 
 	unsigned int get_result_size() {
