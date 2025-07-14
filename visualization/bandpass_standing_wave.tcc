@@ -15,9 +15,9 @@ struct BPSW_Spec {
 	bool win_window_fn; // Apply window function
 	bool adaptive_crop;
 
-	bool use_filter;
-	double f_cutoff;
-	bool is_lowpass;
+	bool use_filter = false;
+	double f_cutoff = 5e3;
+	bool is_lowpass = false;
 
 	double fft_dispersion; // arg(fft(window)) freq. dependent weighing
 	BPSW_Phase fft_phase; // Type of phase manipulation for inverse trafo
