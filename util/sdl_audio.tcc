@@ -54,6 +54,12 @@ namespace audio {
             // throw std::runtime_error("We didn't get the wanted samples.");
         }
 
+        if (spec_avail.freq != spec.freq) {
+            // spec.samples = spec_avail.samples;
+            printf("Audio device reported different frequency of %d Hz.\n", spec_avail.freq);
+            // throw std::runtime_error("We didn't get the wanted samples.");
+        }
+
 
         SDL_PauseAudioDevice(dev, 0);
 
