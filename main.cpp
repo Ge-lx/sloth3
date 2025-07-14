@@ -678,13 +678,13 @@ int main (int argc, char** argv) {
 
     constexpr size_t num_handlers = 4;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw, &bpsw3, &bpsw4/*, &bpsw_inner, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw3, &bpsw4, &bpsw/*, &bpsw_inner, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
     BTrack btrack(spec.freq, spec.samples / 2, spec.samples);
 
-    int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms, target_fps);
+    int retval = sloth_mainloop<SampleT>(device_id, spec, btrack, num_buffers_delay, handlers, num_handlers, print_interval_ms);
     std::cout << "Mainloop ended" << std::endl;
     // delete[] freq_weighing;
     // delete[] freq_weighing_inner;

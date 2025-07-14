@@ -183,10 +183,10 @@ void main()
         float aa_clamp = clamp(aa * 1, 0, 1);
         vec4 pure_color = frag_color;
 
-        if (1 ==1 || i == 0) {
+        if (i < 2) {
             float m = clamp(exp(aa_clamp * 2) * 0.6, 0, 1);
             float m2 = clamp(abs(deviation) / 2, 0, 1);
-            if (target_y > coord[1]) {
+            if (target_y > coord[1] ^^ i == 0) {
                 pure_color = mix(c1b, c1, 1 - m);
             } else {
                 pure_color = mix(c2b, c2, 1 - m);
