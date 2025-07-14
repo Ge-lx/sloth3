@@ -1,14 +1,14 @@
-#include <iostream>
+// #include <iostream>
 #include <stdexcept>
 
 #include "fft_handler.h"
 
 FFTHandler::FFTHandler (size_t n) : n(n) {
-    std::cout << "Allocating SIMD aligned arrays ...";
+    // std::cout << "Allocating SIMD aligned arrays ...";
     real = fftw_alloc_real(n);
-    std::cout << " real done ... ";
+    // std::cout << " real done ... ";
     complex = fftw_alloc_complex(n/2 + 1);
-    std::cout << " complex done." << std::endl;
+    // std::cout << " complex done." << std::endl;
     plan_r2c = fftw_plan_dft_r2c_1d(n, real, complex, FFTW_ESTIMATE);
     plan_c2r = fftw_plan_dft_c2r_1d(n, complex, real, FFTW_ESTIMATE);
     if (plan_r2c == NULL) {
@@ -17,11 +17,11 @@ FFTHandler::FFTHandler (size_t n) : n(n) {
     if (plan_c2r == NULL) {
         throw std::runtime_error("Could not create c2r plan!");
     }
-    std::cout << "Plans done" << std::endl;
+    // std::cout << "Plans done" << std::endl;
 }
 
 FFTHandler::~FFTHandler () {
-    std::cout << "Deallocating plans" << std::endl;
+    // std::cout << "Deallocating plans" << std::endl;
     fftw_destroy_plan(plan_r2c);
     fftw_destroy_plan(plan_c2r);
     fftw_free(real);
