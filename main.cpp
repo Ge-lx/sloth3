@@ -106,7 +106,7 @@ double time_diff_us (std::chrono::time_point<clk> const& a, std::chrono::time_po
 
 template <typename SampleT>
 int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, size_t num_buffers_delay,
-    VisualizationHandler** handlers, size_t const num_handlers, double print_interval_ms, unsigned int const target_fps) {
+    VisualizationHandler** handlers, size_t const num_handlers, double print_interval_ms) {
 
     using namespace audio;
 
@@ -444,9 +444,10 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             last_print = now;
             std::cout << "Processed in " << std::setw(10) << frame_avg_us << " us | "
                 << std::setw(8) << std::fixed << std::setprecision(2)
-                << frame_avg_us / frame_us_nominal * 100 << "% for " << target_fps << "FPS "
+                << frame_avg_us / frame_us_nominal * 100 << "% util. "
                 << "(" << std::setw(2) << xrun_counter << " XRUNS) | \t"
-                << "BPM: " << tempo_estimate << std::endl;
+                << "BPM: " << std::setw(2) << tempo_estimate << " | \t" 
+                << "FPS: " << std::setw(5) << std::fixed << std::setprecision(2) << frame_counter/2.0  << std::endl;
             frame_counter = 0;
             xrun_counter = 0;
         }
@@ -534,17 +535,11 @@ int main (int argc, char** argv) {
     const static size_t K = 8;
     const static size_t n_hop = (n_w / K);
 
-
-    const static unsigned int target_fps = 60;
-    const static double update_interval_ms = 1000.0 / ((double) target_fps);
-    const static double window_length_ms = 100;
     const static double print_interval_ms = 2000;
     const static int num_buffers_delay = 1;//20;
 
     // size_t window_length_samples = window_length_ms / 1000 * spec.freq;
     spec.samples = (size_t) n_hop;
-
-
 
     BPSW_Spec params {
         .win_length_samples = n_fft * 4,
