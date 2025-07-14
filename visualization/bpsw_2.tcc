@@ -35,7 +35,7 @@ private:
 	void visualize (VisualizationBuffer const& data) {
 
 		// Update the rolling window
-		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples, false);
+		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples);
         size_t idx_pad_end = (params.n_fft - params.n_w) / 2;
 
         std::fill(fftHandler->real, fftHandler->real + params.n_fft, double(0));

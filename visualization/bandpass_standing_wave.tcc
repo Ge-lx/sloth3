@@ -42,7 +42,7 @@ private:
 
 		// Update the rolling window and
 		size_t index_last = rollingWindow->current_index();
-		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples, data.is_new_beat);
+		double* const window_data = rollingWindow->update(data.audio_buffer, audio_spec.samples);
 
 		// Execute fourier transformation
 		memcpy(fftHandler->real, window_data, params.win_length_samples * sizeof(double));
