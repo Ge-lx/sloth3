@@ -35,6 +35,8 @@ private:
 	FFTHandler* fftHandler = NULL;
 	double* result = NULL;
 	double* freq_weights = NULL;
+    double* abs_vals = NULL;
+    double* arg_vals = NULL;
 
 	void visualize (VisualizationBuffer const& data) {
 
@@ -48,8 +50,7 @@ private:
 
 	    // Convert to polar basis
 	    const size_t c_length = params.win_length_samples / 2 + 1;
-	    double* abs_vals = new double[c_length]; // Allocation inside hot path. Refactor into class members.
-	    double* arg_vals = new double[c_length];
+
 	    for (size_t i = 0; i < c_length; i++) {
 	        std::complex<double> c(fftHandler->complex[i][0], fftHandler->complex[i][1]);
 	        abs_vals[i] = std::abs(c);
@@ -80,8 +81,6 @@ private:
 	        fftHandler->complex[i][0] = std::real(c);
 	        fftHandler->complex[i][1] = std::imag(c);
 	    }
-	    delete[] abs_vals; // See above. Allocation in hot path
-	    delete[] arg_vals;
 
 	    // Execute inverse fourier transformation
 	    fftHandler->exec_c2r();
@@ -115,18 +114,22 @@ private:
 		params.win_length_samples = window_length;
 		params.crop_length_samples = window_length;
 
+		const size_t c_length = window_length / 2 + 1;
+
 		if (rollingWindow != NULL) delete rollingWindow;
 		if (fftHandler != NULL) delete fftHandler;
 		if (result != NULL) delete[] result;
 		if (freq_weights != NULL) delete[] freq_weights;
+		if (abs_vals != NULL) delete[] abs_vals;
+		if (arg_vals != NULL) delete[] arg_vals;
 
 		rollingWindow = new RollingWindow<double>(params.win_length_samples, 0, params.win_window_fn);
 		fftHandler = new FFTHandler(params.win_length_samples);
 		result = new double[params.win_length_samples];
+		abs_vals = new double[c_length];
+		arg_vals = new double[c_length];
 
 		if (params.use_filter) {
-			const size_t c_length = params.win_length_samples / 2 + 1;
-
 			double* freq_bins = new double[c_length];
 			math::freqs_for_dft_r2c(freq_bins, c_length, (size_t) audio_spec.freq);
 
@@ -167,5 +170,7 @@ public:
 		if (fftHandler != NULL) delete fftHandler;
 		if (result != NULL) delete[] result;
 		if (freq_weights != NULL) delete[] freq_weights;
+		if (abs_vals != NULL) delete[] abs_vals;
+		if (arg_vals != NULL) delete[] arg_vals;
 	}
 };
