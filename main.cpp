@@ -538,16 +538,16 @@ int main (int argc, char** argv) {
     BPSW_Spec params {
         .win_length_samples = n_fft * 4,
         .update_length_samples = spec.samples,
-        .win_window_fn = false,
+        .win_window_fn = true,
         .adaptive_crop = true,
-        .fft_dispersion = 0,//0.1343,
+        .fft_dispersion = 0.1343,
         .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 0,
         .crop_length_samples = n_fft * 4,
         .crop_offset = 0,
         .display_params = {
             .base = 0.7,
-            .scale = 0.4,
+            .scale = 0.6,
             .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
         }
     };
