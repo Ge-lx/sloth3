@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mutex.h>
 #include <SDL2/SDL_thread.h>
 #include <deque>
 #include <vector>
@@ -27,6 +28,7 @@ private:
     bool should_stop = false;
     bool running = false;
     bool buffer_processed = true;
+    bool result_taken = true;
     VisualizationBuffer buffer;
 
     static int worker_thread (void * _self) {
@@ -35,13 +37,14 @@ private:
     		SDL_LockMutex(self->vh_mutex);
 	    	self->running = true;
 			if (self->should_stop) {
-				SDL_CondBroadcast(self->vh_cond);
 				printf("Exiting worker_thread.\n");
 				self->running = false;
 				SDL_UnlockMutex(self->vh_mutex);
+				SDL_CondBroadcast(self->vh_cond);
 				break;
 			}
 
+			SDL_CondBroadcast(self->vh_cond);
 			SDL_CondWait(self->vh_cond, self->vh_mutex);
 			if (self->buffer_processed == true || self->should_stop) {
 				SDL_UnlockMutex(self->vh_mutex);
@@ -51,8 +54,8 @@ private:
 			self->visualize(self->buffer);
 			self->buffer_processed = true;
 
-	        SDL_CondSignal(self->vh_cond);
 	        SDL_UnlockMutex(self->vh_mutex);
+	        SDL_CondBroadcast(self->vh_cond);
     	}
     	return 0;
 	}
@@ -73,8 +76,8 @@ public:
 		// Send stop signal
 		SDL_LockMutex(vh_mutex);
 		should_stop = true;
-		SDL_CondSignal(vh_cond);
 		SDL_UnlockMutex(vh_mutex);
+		SDL_CondBroadcast(vh_cond);
 
 		// Await thread exit
 		SDL_WaitThread(vh_thread, NULL);
@@ -83,13 +86,24 @@ public:
 	virtual unsigned int get_result_size () = 0;
 
 	virtual void process_ring_buffer (VisualizationBuffer const& data) final {
+		SDL_CondBroadcast(vh_cond);
+
 		SDL_LockMutex(vh_mutex);
+		if (!buffer_processed) {
+			SDL_UnlockMutex(vh_mutex);
 
-		buffer = data;
-		buffer_processed = false;
+			await_buffer_processed(false);
+			while (result_taken == false) {
+				SDL_CondWait(vh_cond, vh_mutex);
+			}
+		} else {
+			buffer = data;
+			buffer_processed = false;
+			result_taken = false;
+		}
 
-        SDL_CondSignal(vh_cond);
         SDL_UnlockMutex(vh_mutex);
+        SDL_CondBroadcast(vh_cond);
 	}
 
 	void handle_new_beat (double tempo_estimate) {
@@ -99,8 +113,11 @@ public:
 	}
 
 	void await_buffer_processed (bool unlock = true) {
+		SDL_CondBroadcast(vh_cond);
+
 		SDL_LockMutex(vh_mutex);
 		while (buffer_processed == false) {
+			SDL_CondBroadcast(vh_cond);
 			SDL_CondWait(vh_cond, vh_mutex);
 		}
 		if (unlock) {
@@ -111,6 +128,7 @@ public:
 	void await_result (float* result) {
 		await_buffer_processed(false);
 		get_result(result);
+		result_taken = true;
 		SDL_UnlockMutex(vh_mutex);
 	}
 
