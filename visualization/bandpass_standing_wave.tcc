@@ -100,7 +100,7 @@ private:
 	void on_new_beat (double tempo_estimate) {
 		if (params.adaptive_crop) {
 			double beat_period_sec = 60 / tempo_estimate;
-			size_t beat_period_samples = round(audio_spec.freq * beat_period_sec);
+			size_t beat_period_samples = round(audio_spec.freq * beat_period_sec / 2.0);
 
 			if (beat_period_samples == params.win_length_samples) {
 				return;

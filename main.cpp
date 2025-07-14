@@ -546,7 +546,7 @@ int main (int argc, char** argv) {
         .update_length_samples = spec.samples,
         .win_window_fn = true,
         .adaptive_crop = true,
-        .fft_dispersion = 0.1343,
+        .fft_dispersion = 0.3343,
         .fft_phase = BPSW_Phase::Standing,
         .fft_phase_const = 0,
         .crop_length_samples = n_fft * 4,
