@@ -546,9 +546,20 @@ int main (int argc, char** argv) {
         .crop_length_samples = n_fft * 4,
         .crop_offset = 0,
         .display_params = {
-            .base = 0.7,
-            .scale = 0.6,
+            .base = 0.75,
+            .scale = 0.4,
             .color_inner = {0.9803921568627451, 0.6509803921568628, 0.07450980392156863, 1.0}
+        }
+    };
+
+    BPSW2_Spec params4 {
+        .n_w = n_w,
+        .n_hop = n_hop,
+        .n_fft = n_fft,
+        .display_params = {
+            .base = 0.35,
+            .scale = 0.45,
+            .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
         }
     };
 
@@ -557,8 +568,8 @@ int main (int argc, char** argv) {
         .n_hop = n_hop,
         .n_fft = n_fft,
         .display_params = {
-            .base = 0.2,
-            .scale = 0.4,
+            .base = -0.15,
+            .scale = 0.45,
             .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
         }
     };
@@ -568,8 +579,8 @@ int main (int argc, char** argv) {
         .n_hop = n_hop,
         .n_fft = n_fft,
         .display_params = {
-            .base = -0.5,
-            .scale = 0.4,
+            .base = -0.7,
+            .scale = 0.37,
             .color_inner = {0.03529411764705882, 0.20392156862745098, 0.48627450980392156, 1.0}
         }
     };
@@ -580,36 +591,48 @@ int main (int argc, char** argv) {
 
     double* freq_weighing_low = new double[c_length];
     double* freq_weighing_mid = new double[c_length];
+    double* freq_weighing_high = new double[c_length];
 
     double x_over = 150;
-    double x_over_high = 3500;
+    double x_over_high = 600;
+    double x_over_top = 4000;
     double transition = 50;
     for (size_t i = 0; i < c_length; i++) {
         if (freq_bins[i] < x_over) {
             freq_weighing_low[i] = 1;
             freq_weighing_mid[i] = 0;
+            freq_weighing_high[i] = 0;
         } else if (freq_bins[i] < (x_over + transition)) {
             double x = (freq_bins[i] - x_over) / transition;
             freq_weighing_low[i] = 1-x;
             freq_weighing_mid[i] = x;
+            freq_weighing_high[i] = 0;
         } else if (freq_bins[i] < x_over_high) {
             freq_weighing_low[i] = 0;
-            freq_weighing_mid[i] = 2;
+            freq_weighing_mid[i] = 1;
+            freq_weighing_high[i] = 0;
         } else if (freq_bins[i] < (x_over_high + transition)) {
             double x = (freq_bins[i] - x_over_high) / transition;
             freq_weighing_low[i] = 0;
-            freq_weighing_mid[i] = 1-x;;
+            freq_weighing_mid[i] = 1-x;
+            freq_weighing_high[i] = x;
+        } else if (freq_bins[i] < x_over_top) {
+            freq_weighing_low[i] = 0;
+            freq_weighing_mid[i] = 0;
+            freq_weighing_high[i] = 1;
         } else {
             freq_weighing_low[i] = 0;
             freq_weighing_mid[i] = 0;
+            freq_weighing_high[i] = 0;
         }
     }
 
     params2.fft_freq_weighing = freq_weighing_low;
     params3.fft_freq_weighing = freq_weighing_mid;
+    params4.fft_freq_weighing = freq_weighing_high;
 
     params.use_filter = true;
-    params.f_cutoff = x_over_high;
+    params.f_cutoff = x_over_top;
     params.is_lowpass = false;
 
     // BPSW_Spec params_inner {
@@ -639,6 +662,7 @@ int main (int argc, char** argv) {
     printf("Instantiating visualizations\n");
     BPSW2 bpsw2 (spec, params2, true);
     BPSW2 bpsw3 (spec, params3, true);
+    BPSW2 bpsw4 (spec, params4, true);
     BandpassStandingWave bpsw {spec, params};
 
     /*
@@ -646,9 +670,9 @@ int main (int argc, char** argv) {
     */
     printf("Done\n");
 
-    constexpr size_t num_handlers = 3;
+    constexpr size_t num_handlers = 4;
     printf("Instantiating visualization handler\n");
-    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw, &bpsw3/*, &bpsw_inner, &bpsw2*/};
+    VisualizationHandler* handlers[num_handlers] = {&bpsw2, &bpsw, &bpsw3, &bpsw4/*, &bpsw_inner, &bpsw2*/};
     printf("Done\n");
 
     std::cout << "Initializing BTrack with " << spec.samples << " samples" << std::endl;
