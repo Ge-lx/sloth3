@@ -212,12 +212,20 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
     glfwMakeContextCurrent(window);
 
+
+    const size_t num_samples = 20;
+    size_t last_beat_idcs[num_samples];
+    for (size_t i = 0; i < num_samples; i++) last_beat_idcs[i] = 0;
+    size_t sample_idx = 0;
+    double tempo_estimate = 120;
+
     // Rendering loop
     while(!glfwWindowShouldClose(window))
     {
         try {
             SampleT* const buf = ringBuffer->dequeue_dirty();
             last_frame = clk::now();
+            sample_idx += spec.samples;
 
             for (size_t i = 0; i < spec.samples; i++) {
                 mono[i] = buf[2*i] / ((double) std::pow(2, 16));//(buf[2*i] + buf[2*i + 1]) / ((double) std::pow(2, 17));
@@ -240,7 +248,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
 
         btrack.processAudioFrame(mono);
         bool is_new_beat = btrack.beatDueInCurrentFrame();
-        double tempo_estimate = btrack.getCurrentTempoEstimate();
+        // double tempo_estimate = btrack.getCurrentTempoEstimate();
 
         VisualizationBuffer const data {
             .audio_buffer = mono,
@@ -248,7 +256,25 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             .is_new_beat = is_new_beat
         };
 
+
         if (is_new_beat) {
+            size_t samples_diff = (sample_idx - last_beat_idcs[num_samples-1]) / num_samples;
+
+            for (int i = num_samples-2; i >= 0; i--) {
+                last_beat_idcs[i+1] = last_beat_idcs[i];
+            }
+            last_beat_idcs[0] = sample_idx;
+
+
+            if (samples_diff != 0) {
+                double new_period = samples_diff / (double) spec.freq;
+                tempo_estimate = round(60 / new_period);
+
+                if (tempo_estimate < 80 || tempo_estimate > 180) {
+                    tempo_estimate = 120;
+                }
+            }
+
             for (size_t i = 0; i < num_handlers; i++) {
                 handlers[i]->handle_new_beat(tempo_estimate);
             }
