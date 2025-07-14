@@ -1,3 +1,4 @@
+#include <SDL2/SDL_mutex.h>
 #include <queue>
 #include <stdexcept>
 #include <iostream>
@@ -46,6 +47,13 @@ public:
             SDL_CondSignal(rb_cond);
         }
         SDL_UnlockMutex(rb_mutex);
+    }
+
+    size_t size () {
+        SDL_LockMutex(rb_mutex);
+        const size_t size = q.size();
+        SDL_UnlockMutex(rb_mutex);
+        return size;
     }
 
     // Get the "front"-element.
@@ -126,6 +134,14 @@ public:
     T* dequeue_dirty () {
         if (draining) throw timeout_exception("RingBuffer is draining");
         return dirty.dequeue();
+    }
+
+    size_t size_clean () {
+        return clean.size();
+    }
+
+    size_t size_dirty () {
+        return dirty.size();
     }
 
     void enqueue_clean (T* buf) {
