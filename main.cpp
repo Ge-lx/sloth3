@@ -116,7 +116,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     printf("Audio input delay of %.1f ms\n", num_buffers_delay * spec.samples / (double) spec.freq * 1000.0);
     RingBuffer<SampleT>* ringBuffer = new RingBuffer<SampleT>(spec.channels * spec.samples, num_buffers_delay);
     double* mono = new double[spec.samples];
-    math::ExpFilter<double> max_filter(1, 0.90, 0.04, 1);
+    math::ExpFilter<double> max_filter(1, 0.30, 0.04, 1);
 
     auto device_names = get_audio_device_names();
     std::cout << "Starting audio stream on \"" << device_names[device_id] << "\"" << std::endl;
@@ -130,6 +130,7 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     double frame_us_nominal = (spec.samples / (double) spec.freq) * 1000000;
     double frame_us_acc = 0;
     size_t frame_counter = 0;
+    size_t xrun_counter = 0;
 
     // Initialization of OpenGL context using GLFW
     glfwInit();
@@ -223,7 +224,15 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
     while(!glfwWindowShouldClose(window))
     {
         try {
-            SampleT* const buf = ringBuffer->dequeue_dirty();
+            SampleT* buf = ringBuffer->dequeue_dirty();
+
+            // Purge over-runs
+            while (ringBuffer->size_dirty() > (num_buffers_delay + 1)) {
+                xrun_counter += 1;
+                ringBuffer->enqueue_clean(buf);
+                buf = ringBuffer->dequeue_dirty();
+            }
+
             last_frame = clk::now();
             sample_idx += spec.samples;
 
@@ -435,9 +444,11 @@ int sloth_mainloop (uint16_t device_id, SDL_AudioSpec& spec, BTrack& btrack, siz
             last_print = now;
             std::cout << "Processed in " << std::setw(10) << frame_avg_us << " us | "
                 << std::setw(8) << std::fixed << std::setprecision(2)
-                << frame_avg_us / frame_us_nominal * 100 << "% for " << target_fps << "FPS | \t"
+                << frame_avg_us / frame_us_nominal * 100 << "% for " << target_fps << "FPS "
+                << "(" << std::setw(2) << xrun_counter << " XRUNS) | \t"
                 << "BPM: " << tempo_estimate << std::endl;
             frame_counter = 0;
+            xrun_counter = 0;
         }
     }
 

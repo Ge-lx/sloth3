@@ -93,8 +93,9 @@ public:
     size_t buffer_len, num_buffers;
 
     RingBuffer (size_t buffer_len, size_t min_fill_len) :
-        clean(1), dirty(min_fill_len), buffer_len(buffer_len), num_buffers(min_fill_len + 1)
+        clean(1), dirty(min_fill_len), buffer_len(buffer_len)
     {
+        num_buffers = min_fill_len + 1 + 2; // One for clean, two as buffer
         for (size_t i = 0; i < num_buffers; i++) {
             clean.enqueue(new T[buffer_len]);
         }
